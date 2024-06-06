@@ -36,3 +36,58 @@ class NationalPlayerID(Hashable):
     
     def __eq__(self, value: object) -> bool:
         return self._val.__eq__(value)
+
+
+@dataclass
+class Player(EntityABC):
+    """Player Entity
+
+    A Player is identified by its unique National Player ID
+    and: surname, name and birthdate
+    """
+    national_player_id: NationalPlayerID
+    surname: str
+    name: str
+    birthdate: date
+
+    def id(self) -> NationalPlayerID:
+        return self.national_player_id
+
+    def set_id(self, id: NationalPlayerID):
+        self.id = id
+
+class PlayerJSONEncoder(json.JSONEncoder):
+    """Encode Player object to JSON
+    """
+    def default(self, o: Player):
+        if isinstance(o, Player):
+            return {
+                'national_player_id' : str(o.national_player_id),
+                'surname' : o.surname,
+                'name' : o.name,
+                'birthdate': o.birthdate.isoformat()
+            }
+        else:
+            return super().default(o)
+
+class PlayerJSONDecoder(json.JSONDecoder):
+    """Decode Player object from JSON
+    """
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.obj_hook, *args, **kwargs)
+
+    def obj_hook(self, dct):
+        if 'national_player_id' not in dct:
+            return dct
+        return Player(
+            national_player_id=dct['national_player_id'],
+            surname= dct['surname'],
+            name= dct['name'],
+            birthdate=date.fromisoformat(dct['birthdate'])
+        )
+
+class PlayerRepository(JSONRepository[Player]):
+    """Store player data to a JSON file.
+    """
+    def __init__(self, filename):
+        super().__init__(file= filename, encoder= PlayerJSONEncoder, decoder= PlayerJSONDecoder)
