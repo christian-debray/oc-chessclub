@@ -47,6 +47,11 @@ class JSONStorage(MutableMapping):
 
 class JSONRepository(GenericRepository[EntityType]):
     """Generic implementation of a Repository that retrieves and writes data from a JSON file.
+
+    The data is stored as a dictionnary to the JSON file.
+    The JSON data is indexed by the entity ids, converted as strings.
+
+    WARNING: For now, we don't support concurrent access of the data in the file...
     """
     def __init__(self, file, encoder, decoder):
         self._changes = []
@@ -60,27 +65,27 @@ class JSONRepository(GenericRepository[EntityType]):
     def add(self, entity: EntityType):
         if not entity.id():
             raise KeyError('Missing Entity ID')
-        if entity.id() in self._store:
+        if str(entity.id()) in self._store:
             raise KeyError('Duplicate Entity ID')
-        self._store[entity.id()] = entity
-        self._changes.append(('add', entity.id()))
+        self._store[str(entity.id())] = entity
+        self._changes.append(('add', str(entity.id())))
     
     def update(self, entity: EntityType):
-        if not entity.id() in self._store:
+        if not str(entity.id()) in self._store:
             self.add(entity)
         else:
-            self._changes.append('update', entity.id())
+            self._changes.append(('update', str(entity.id())))
 
     def delete(self, key: Hashable = None, **conditions):
         if key is not None:
-            del self._store[key]
-            self._changes.append('delete', key)
+            del self._store[str(key)]
+            self._changes.append(('delete', str(key)))
         elif len(conditions) > 0:
             for item in self.find_many(**conditions):
                 self.delete(item.id())
 
     def find_by_id(self, id: Hashable) -> EntityType:
-        return self._store.get(id)
+        return self._store.get(str(id))
 
     def list_all(self) -> Sequence[EntityType]:
         return list(self._store.values())
@@ -88,4 +93,4 @@ class JSONRepository(GenericRepository[EntityType]):
     def find_many(self, **filters) -> Sequence[EntityType]:
         if not len(filters):
             return self.list_all()
-        return list(generic_entity_filter_func(**filters), self._store.values())
+        return list(filter(generic_entity_filter_func(**filters), self._store.values()))
