@@ -1,16 +1,39 @@
 from abc import ABC, abstractmethod
 from app.views.app_status_view import AppStatusView
-
-class AbstractController(ABC):
-    """Base class for all controllers
-
-    A controller
-      - pilots the application workflow
-      - updates the model on user input
-      - updates the view with new data pulled from the model
-    """
-    pass
+from typing import Callable
+from app.views.menu import Menu
 
 class BaseController:
     def __init__(self):
       self.status = AppStatusView()
+
+class MenuController:
+    """A generic menu controller.
+    Provides a loop to choose
+    """
+    def __init__(self, menu_title: str = None):
+      self._options_map = []
+      self._menu = Menu(title= menu_title)
+
+    def set_title(self, title: str):
+       self._menu.title = title
+
+    def add_option(self, opt_action: Callable | None, opt_text: str):
+      self._options_map.append((opt_action, opt_text))
+      self._menu.options.append(opt_text)
+
+    def menu_loop(self):
+        """User selects next action.
+        Loops until user selects an option mapped to None.
+        """
+        loop = True
+        while loop:
+            choice = self._menu.choose()
+            if choice is not None:
+                do = self._options_map[choice][0]
+                if do is not None and callable(do):
+                    do()
+                else:
+                    loop = False
+            else:
+                loop = False

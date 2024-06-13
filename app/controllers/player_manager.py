@@ -1,7 +1,8 @@
 from app.models.player_model import PlayerRepository, Player, NationalPlayerID
 from app.views.player_editor import PlayerEditor
 from app.views.player_view import PlayerView
-from app.controllers.controller_abc import BaseController
+from app.views.menu import Menu
+from app.controllers.controller_abc import BaseController, MenuController
 import logging
 logger = logging.getLogger()
 
@@ -9,7 +10,22 @@ class PlayerManager(BaseController):
     def __init__(self, player_repo: PlayerRepository):
         super().__init__()
         self.player_repo: PlayerRepository = player_repo
+        self._make_menu()
     
+    def _make_menu(self):
+        """Build our menu
+        """
+        self.menu_mngr = MenuController("Manage Players")
+        self.menu_mngr.add_option(opt_action= self.register_new_player, opt_text= "Register a new player")
+        self.menu_mngr.add_option(opt_action= self.edit_player, opt_text= "Edit player")
+        self.menu_mngr.add_option(opt_action= self.list_all_players, opt_text= "List All Players")
+        self.menu_mngr.add_option(opt_action= None, opt_text= "Exit")
+
+    def menu(self):
+        """User selects next action
+        """
+        self.menu_mngr.menu_loop()
+
     def register_new_player(self):
         """Register a new player in the database.
         """
@@ -124,7 +140,9 @@ if __name__ == '__main__':
 
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", default="create", choices=["create", "edit", "list"])
+    parser.add_argument("--action", default="menu", choices=["create", "edit", "list", "menu"])
+    parser.add_argument("-m", nargs="?", dest="action", const="menu")
+    parser.add_argument("-c", nargs="?", dest="action", const="create")
     parser.add_argument("-e", nargs="?", dest="action", const="edit")
     parser.add_argument("-l", nargs="?", dest="action", const="list")
 
@@ -139,4 +157,6 @@ if __name__ == '__main__':
     elif args.action == "list":
         print("*** LIST PLAYERS ***")
         manager.list_all_players()
+    elif args.action == "menu":
+        manager.menu()
 
