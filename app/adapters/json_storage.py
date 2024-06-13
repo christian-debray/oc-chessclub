@@ -3,6 +3,7 @@ from _collections_abc import MutableMapping
 from typing import Any, Iterator
 from typing import Hashable, Sequence
 from app.models.model_baseclasses import EntityABC, EntityType, GenericRepository, generic_entity_filter_func
+from pathlib import Path
 
 class JSONStorage(MutableMapping):
     """A Dict-like object linked to a JSON file.
@@ -12,10 +13,15 @@ class JSONStorage(MutableMapping):
     """
     def __init__(self, json_file, encoder: json.JSONEncoder = None, decoder: json.JSONDecoder = None):
         self._store = {}
-        self._file = json_file
+        self._file = Path(json_file).resolve()
         self.encoder = encoder
         self.decoder = decoder
-        self.load_store()
+        if self._file.exists():
+            self.load_store()
+        else:
+            # check now we have proper access to the file:
+            self._file.touch(mode= 0o777)
+            self._file.unlink()
 
     def load_store(self):
         """(re)-loads this storage from the linked JSON file
@@ -27,6 +33,8 @@ class JSONStorage(MutableMapping):
     def write_store(self):
         """Dumps this storage to its linked JSON file.
         """
+        if not self._file.exists():
+            self._file.touch(mode= 0o777)
         with open(self._file, "w", encoding="utf8") as json_file:
             json.dump(self._store, json_file, cls=self.encoder, indent=1, ensure_ascii=False)
     
