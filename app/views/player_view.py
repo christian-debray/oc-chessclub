@@ -1,7 +1,7 @@
 from app.models.player_model import Player
 from datetime import date
 from app.helpers.string_formatters import format_cols
-from app.adapters.simpleinput import prompt_v, proceed_any_key
+from app.helpers.text_ui import proceed_any_key
 
 class PlayerView:
 

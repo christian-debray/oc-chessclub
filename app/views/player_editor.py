@@ -1,5 +1,5 @@
 from app.models.player_model import Player, is_valid_national_player_id
-from app.adapters.simpleinput import prompt_v, confirm
+from app.helpers.text_ui import prompt_v, confirm
 import app.helpers.validation as validation
 from datetime import date
 from app.views.app_status_view import AppStatusView

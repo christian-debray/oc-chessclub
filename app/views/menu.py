@@ -1,5 +1,4 @@
-import app.helpers.validation as validation
-from app.adapters.simpleinput import prompt_v
+from app.helpers.text_ui import prompt_v
 
 class Menu:
     def __init__(self, title: str = None, options: list[str] = None):

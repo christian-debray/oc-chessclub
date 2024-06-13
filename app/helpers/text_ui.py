@@ -1,7 +1,8 @@
-"""Simple Text input with validation
+"""Toolkit providing simple controls to use in a text-based app.
 """
 import re
 from typing import Callable
+import os
 from app.helpers import ansi
 # ansio: alpha revision
 # detect keyboard events.
@@ -39,6 +40,9 @@ def proceed_any_key(msg="Press any key to proceed", timeout: float = None):
         evt = ansio.input.get_input_event(timeout=timeout)
 
 def confirm(msg="press Y to confirm", timeout: float = None):
+    """Prompts user to confirm an action y pressing a specific key ('y').
+    
+    Returns True if user confirmed, False otherwise."""
     print(ansi.Formatter.format(msg, ansi.Formatter.CYAN))
     evt = None
     with ansio.raw_input:
@@ -46,3 +50,13 @@ def confirm(msg="press Y to confirm", timeout: float = None):
     if evt:
         return evt.upper() == 'Y'
     return False
+
+def clear(self):
+    """Clears the console screen.
+
+    (makes a call to the OS system)
+    """
+    if os.name == 'nt':
+        _ = os.system('cls')
+    else:
+        _ = os.system('clear')
