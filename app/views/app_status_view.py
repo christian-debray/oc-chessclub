@@ -8,6 +8,9 @@ class AppStatusView:
     def notify(self, msg: str):
         print(msg)
 
+    def notify_warning(self, msg: str):
+        self.notify(Formatter.format(msg, 'yellow'))
+
     def notify_success(self, msg: str):
         self.notify(Formatter.format(msg, 'light_green'))
     
