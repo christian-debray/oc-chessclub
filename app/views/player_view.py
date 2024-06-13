@@ -1,6 +1,7 @@
 from app.models.player_model import Player
 from datetime import date
 from app.helpers.string_formatters import format_cols
+from app.adapters.simpleinput import prompt_v, proceed_any_key
 
 class PlayerView:
 
@@ -14,4 +15,7 @@ class PlayerView:
     def print_player_list(self, players: list[Player]):
         p_lines = [self.player_template(p, as_cells= True) for p in players]
         print(format_cols(p_lines, ["Player ID", "Name", "Birthdate"]))
+
+        print("\n")
+        proceed_any_key(timeout=10)
 

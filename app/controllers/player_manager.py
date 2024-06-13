@@ -30,8 +30,8 @@ class PlayerManager(BaseController):
         """Register a new player in the database.
         """
         editor = PlayerEditor(self.status)
-        player = editor.prompt_for_player_data(Player())
-        self._add_new_player(player)
+        if player := editor.prompt_for_player_data(Player()):
+            self._add_new_player(player)
     
     def select_player(self):
         """Selects a player from the database for further operation
@@ -63,8 +63,8 @@ class PlayerManager(BaseController):
                 self.status.notify_failure("Player not found: " + str(e))
                 return
         editor = PlayerEditor(self.status)
-        player_copy = editor.prompt_for_player_data(player)
-        self._update_player(player_copy, player)
+        if player_copy := editor.prompt_for_player_data(player):
+            self._update_player(player_copy, player)
 
     def _add_new_player(self, player: Player) -> bool:
         """Register a new player to the database

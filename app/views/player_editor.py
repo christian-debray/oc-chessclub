@@ -1,5 +1,5 @@
 from app.models.player_model import Player, is_valid_national_player_id
-from app.adapters.simpleinput import prompt_v
+from app.adapters.simpleinput import prompt_v, confirm
 import app.helpers.validation as validation
 from datetime import date
 from app.views.app_status_view import AppStatusView
@@ -54,7 +54,11 @@ class PlayerEditor:
         elif player.birthdate:
             self.status.notify_warning(f"Keeping previous value: {player.birthdate.isoformat()}")
 
-        return edited_player
+        if confirm(msg="Store changes ? (Press Y to confirm)"):
+            return edited_player
+        else:
+            self.status.notify_warning("Discarding changes.")
+        return None
 
     def player_id_prompt(self, prompt: str):
         return prompt_v(prompt= prompt,
