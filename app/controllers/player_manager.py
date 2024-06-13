@@ -1,5 +1,6 @@
 from app.models.player_model import PlayerRepository, Player, NationalPlayerID
 from app.views.player_editor import PlayerEditor
+from app.views.player_view import PlayerView
 from app.controllers.controller_abc import BaseController
 import logging
 logger = logging.getLogger()
@@ -106,6 +107,16 @@ class PlayerManager(BaseController):
             self.status.notify_failure("Failed to update player because of an unexpected error. Abandon.")
         return False
 
+    def list_all_players(self):
+        player_list = list(self.player_repo.find_many())
+        if len(player_list) == 0:
+            self.status.notify_warning("No players to display.")
+            return
+        # alphabetic order:
+        player_list.sort(key= lambda x: (x.surname.lower() + x.name.lower()))
+        view = PlayerView()
+        view.print_player_list(players=player_list)
+
 if __name__ == '__main__':
     logging.basicConfig(filename="./debug.log", level=logging.DEBUG)
     from app import DATADIR
@@ -115,8 +126,9 @@ if __name__ == '__main__':
     import argparse
     action = "create"
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", default="create", choices=["create", "edit"])
+    parser.add_argument("--action", default="create", choices=["create", "edit", "list"])
     parser.add_argument("-e", nargs="?", dest="action", const="edit")
+    parser.add_argument("-l", nargs="?", dest="action", const="list")
 
     args = parser.parse_args()
     manager = PlayerManager(PlayerRepository(player_json_file))
@@ -130,3 +142,7 @@ if __name__ == '__main__':
         player = manager.select_player()
         if player:
             manager.edit_player(player.id())
+    elif args.action == "list":
+        print("*** LIST PLAYERS ***")
+        manager.list_all_players()
+
