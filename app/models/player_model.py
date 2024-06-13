@@ -5,6 +5,7 @@ import re
 from app.adapters.json_storage import JSONRepository
 from _collections_abc import Hashable
 import json
+from app.helpers import validation
 
 NATIONAL_PLAYER_ID_PATTERN = re.compile(r"^[A-Z]{2}[0-9]{5}$")
 
@@ -45,16 +46,24 @@ class Player(EntityABC):
     A Player is identified by its unique National Player ID
     and: surname, name and birthdate
     """
-    national_player_id: NationalPlayerID
-    surname: str
-    name: str
-    birthdate: date
+    national_player_id: NationalPlayerID = None
+    surname: str = None
+    name: str = None
+    birthdate: date = None
 
     def id(self) -> NationalPlayerID:
         return self.national_player_id
 
-    def set_id(self, id: NationalPlayerID):
-        self.id = id
+    def set_id(self, id):
+        self.national_player_id = NationalPlayerID(str(id))
+    
+    def is_valid(self) -> bool:
+        """return True if all data stored by this object is valid.
+        """
+        return is_valid_national_player_id(str(self.id())) and\
+            isinstance(self.birthdate, date) and\
+            validation.is_valid_name(self.surname) and\
+            validation.is_valid_name(self.name)
 
 class PlayerJSONEncoder(json.JSONEncoder):
     """Encode Player object to JSON
