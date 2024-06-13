@@ -1,5 +1,5 @@
 from app.models.player_model import Player, is_valid_national_player_id
-from app.helpers.text_ui import prompt_v, confirm
+from app.helpers.text_ui import prompt_v, confirm, clear
 import app.helpers.validation as validation
 from datetime import date
 from app.views.app_status_view import AppStatusView
@@ -16,7 +16,8 @@ class PlayerEditor:
 
         The edited data will always be returned as a new Player object. The original object remains unchanged.
         """
-        print("PLAYER EDITOR")
+        clear()
+        print("*** PLAYER EDITOR ***")
         print("Please enter Player data.\n(Leave an input blank or hit <ctrl>+<D> to leave field unchanged)\n")
 
         edited_player = Player.copy(player)

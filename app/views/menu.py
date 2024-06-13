@@ -1,4 +1,4 @@
-from app.helpers.text_ui import prompt_v
+from app.helpers.text_ui import prompt_v, clear
 
 class Menu:
     def __init__(self, title: str = None, options: list[str] = None):
@@ -10,6 +10,7 @@ class Menu:
     def choose(self) -> int:
         """Display the menu and prompts for a choice.
         Returns the index of the option selected by the user."""
+        clear()
         if self.title:
             title_str = " ".join([w.capitalize() for w in self.title.split()])
             print(title_str)
