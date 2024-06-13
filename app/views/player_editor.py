@@ -21,7 +21,7 @@ class PlayerEditor:
 
         edited_player = Player.copy(player)
 
-        name_prompt = "First Name" if not player.name else f"First Name (current= {player.name})" + ":\n"
+        name_prompt = ("First Name" if not player.name else f"First Name (current= {player.name})") + ":\n"
         if new_name := prompt_v(prompt= name_prompt,
                         validator= validation.is_valid_name,
                         not_valid_msg="Not a valid name. Accepted characters: letters, space, hyphen and apostrophe",
@@ -30,7 +30,7 @@ class PlayerEditor:
         elif player.name:
             self.status.notify_warning(f"Keeping previous value: {player.name}\n")
 
-        surname_prompt = "Surname" if not player.surname else f"Surname (current= {player.surname})" + ":\n"
+        surname_prompt = ("Surname" if not player.surname else f"Surname (current= {player.surname})") + ":\n"
         if new_surname := prompt_v(prompt= surname_prompt,
                         validator=validation.is_valid_name,
                         not_valid_msg="Not a valid name. Accepted characters: letters, space, hyphen and apostrophe",
@@ -39,13 +39,13 @@ class PlayerEditor:
         elif player.surname:
             self.status.notify_warning(f"Keeping previous value: {player.surname}\n")
         
-        id_prompt = "National Player ID" if not player.national_player_id else f"National Player ID (current= {player.id()})" + ":\n"
+        id_prompt = ("National Player ID" if not player.national_player_id else f"National Player ID (current= {player.id()})") + ":\n"
         if new_national_player_id := self.player_id_prompt(id_prompt):
             edited_player.set_id(new_national_player_id)
         elif player.national_player_id:
             self.status.notify_warning(f"Keeping previous value: {player.id()}\n")
 
-        birthdate_prompt = "Birthdate" if not player.birthdate else f"Birthdate (current= {player.birthdate.isoformat()})" + ":\n"
+        birthdate_prompt = ("Birthdate" if not player.birthdate else f"Birthdate (current= {player.birthdate.isoformat()})") + ":\n"
         if new_birthdate := prompt_v(prompt=birthdate_prompt,
                              validator= validation.is_valid_date,
                              not_valid_msg="Not a valid date. Accepted format: YYYY-MM-DD (ex.: 1987-02-23)",

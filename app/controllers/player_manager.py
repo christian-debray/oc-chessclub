@@ -31,8 +31,11 @@ class PlayerManager(BaseController):
         else:
             self.status.notify_failure("Failed to select player - check the National Player ID.")
 
-    def edit_player(self, player_or_id: str|Player):
+    def edit_player(self, player_or_id: str|Player = None):
         """Edit player identified by player ID."""
+        if not player_or_id:
+            player_or_id = self.select_player()
+
         if isinstance(player_or_id, Player):
             player = player_or_id
         else:
@@ -94,13 +97,9 @@ class PlayerManager(BaseController):
                 if not self.player_repo.find_by_id(new_player_data.id()):
                     return self._add_new_player(new_player_data)
                 
-            old_player_data.national_player_id = new_player_data.national_player_id
-            old_player_data.surname = new_player_data.surname
-            old_player_data.name = new_player_data.name
-            old_player_data.birthdate = new_player_data.birthdate
-            self.player_repo.update(player)
+            self.player_repo.update(new_player_data)
             self.player_repo.commit_changes()
-            self.status.notify_success(f"Updated player: {player.id()}")
+            self.status.notify_success(f"Updated player: {new_player_data.id()}")
             return True                
         except Exception as e:
             logger.exception(e)
@@ -124,7 +123,6 @@ if __name__ == '__main__':
     player_json_file = Path(DATADIR, 'players.json').resolve()
 
     import argparse
-    action = "create"
     parser = argparse.ArgumentParser()
     parser.add_argument("--action", default="create", choices=["create", "edit", "list"])
     parser.add_argument("-e", nargs="?", dest="action", const="edit")
@@ -134,14 +132,10 @@ if __name__ == '__main__':
     manager = PlayerManager(PlayerRepository(player_json_file))
     if args.action == "create":
         print("*** REGISTER NEW PLAYER ***")
-        for i in range(3):
-            manager.status.notify(f"Register New Player, attempt {i+1}")
-            manager.register_new_player()
+        manager.register_new_player()
     elif args.action == "edit":
         print("*** EDIT PLAYER ***")
-        player = manager.select_player()
-        if player:
-            manager.edit_player(player.id())
+        manager.edit_player()
     elif args.action == "list":
         print("*** LIST PLAYERS ***")
         manager.list_all_players()

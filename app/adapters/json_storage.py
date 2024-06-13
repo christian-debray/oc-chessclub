@@ -82,6 +82,7 @@ class JSONRepository(GenericRepository[EntityType]):
         if not str(entity.id()) in self._store:
             self.add(entity)
         else:
+            self._store[entity.id()] = entity
             self._changes.append(('update', str(entity.id())))
 
     def delete(self, key: Hashable = None, **conditions):
