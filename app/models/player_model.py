@@ -65,6 +65,15 @@ class Player(EntityABC):
             validation.is_valid_name(self.surname) and\
             validation.is_valid_name(self.name)
 
+    @classmethod
+    def copy(cls, other_player: 'Player'):
+        """Copies all data from one player ot a new Player object.
+        """
+        return cls(national_player_id = NationalPlayerID(str(other_player.id())) if other_player.id() else None,
+                   surname = other_player.surname,
+                   name= other_player.name,
+                   birthdate= other_player.birthdate)
+
 class PlayerJSONEncoder(json.JSONEncoder):
     """Encode Player object to JSON
     """
@@ -100,3 +109,16 @@ class PlayerRepository(JSONRepository[Player]):
     """
     def __init__(self, filename):
         super().__init__(file= filename, encoder= PlayerJSONEncoder, decoder= PlayerJSONDecoder)
+    
+    def find_by_id(self, id: NationalPlayerID | str) -> Player:
+        """Finds a player by his National Player ID.
+        If parameter is a string, performs a format check first.
+        """
+        if isinstance(id, NationalPlayerID):
+            id_str = str(id)
+        elif not is_valid_national_player_id(id):
+            # first check ID is valid
+            raise ValueError("Invalid ID - expecting Player National ID Format")
+        else:
+            id_str = id
+        return super().find_by_id(id_str)
