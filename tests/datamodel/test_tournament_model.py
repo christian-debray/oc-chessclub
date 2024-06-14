@@ -67,6 +67,22 @@ class utils:
                 ]
         return matches
 
+    @staticmethod
+    def make_tournament() -> tournament_model.Tournament:
+        tournament = tournament_model.Tournament()
+        tournament.dates = (datetime.fromisoformat("2024-05-02 15:00:00"), None)
+        tournament.description = " ".join([utils.randstring(random.randint(2, 12)) for _ in range(10)])
+        tournament.location = utils.randstring(12)
+
+        match_list = utils.make_matches()
+        tournament.turns[0] = tournament_model.Turn("test turn", matches= match_list)
+        for m in match_list:
+            tournament.participants.append(m.player1())
+            tournament.player_scores[m.player1().id()] = random.randint(0, 3) * .5
+            tournament.participants.append(m.player2())
+            tournament.player_scores[m.player2().id()] = random.randint(0, 3) * .5
+        return tournament
+
 class TestTournamentJSON(unittest.TestCase):
     """Test JSON encoding and decoding of Tournament entities
     """
@@ -87,7 +103,7 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertEqual(player_data[0], [str(m.players[0][0].id()), m.players[0][1]])
         self.assertEqual(player_data[1], [str(m.players[1][0].id()), m.players[1][1]])
 
-    def test_turn_json_encoder(self):
+    def test_turn_as_dict(self):
         """Dump a valid turn to dict without failure, and check data is consistent."""
         match_list = utils.make_matches()
         turn = tournament_model.Turn("test turn", matches= match_list)
@@ -115,4 +131,22 @@ class TestTournamentJSON(unittest.TestCase):
             for p in range(len(turn_match_m.players)):
                 self.assertEqual(dict_match_m_players[p][0], turn_match_m.players[p][0].id())
                 self.assertEqual(dict_match_m_players[p][1], turn_match_m.players[p][1])
+    
+    def test_tournament_as_dict(self):
+        """Export tournament data to a dict object.
+        """
+        tournament = utils.make_tournament()
+        t_data = tournament.as_dict()
+        self.assertIsInstance(t_data, dict)
+        self.assertEqual(t_data.get('location'), tournament.location)
+        tournament_dates = [tournament.dates[0].isoformat() if tournament.dates[0] is not None else None,
+                            tournament.dates[1].isoformat() if tournament.dates[1] is not None else None]
+        self.assertEqual(t_data.get('dates'), tournament_dates)
+        self.assertEqual(len(t_data['turns']), len(tournament.turns))
+        self.assertDictEqual(t_data['player_scores'], tournament.player_scores)
+        for t in range(len(tournament.turns)):
+            if tournament.turns[t] is None:
+                self.assertIsNone(t_data['turns'][t])
+            else:
+                self.assertDictEqual(t_data['turns'][t], tournament.turns[t].as_dict())
 

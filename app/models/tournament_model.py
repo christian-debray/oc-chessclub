@@ -6,7 +6,7 @@ from app.adapters.json_storage import JSONRepository
 from _collections_abc import Hashable
 import json
 from app.helpers import validation
-from app.models.player_model import Player, NationalPlayerID
+from app.models.player_model import Player, NationalPlayerID, PlayerRepository
 
 class Match:
     """A Match between opposing two players.
@@ -26,6 +26,12 @@ class Match:
         self.players: tuple[tuple[Player, float]] = ((player1[0], player1[1]), (player2[0], player2[1]))
         self.start_time: datetime = start_time
         self.end_time: datetime = end_time
+
+    def player1(self) -> Player:
+        return self.players[0][0]
+    
+    def player2(self) -> Player:
+        return self.players[1][0]
 
     def start(self, start_time: datetime = None) -> bool:
         """Start the match.
@@ -100,14 +106,21 @@ class Turn:
 
 class Tournament(EntityABC):
     def __init__(self):
+        self.tournament_id: str
         self.dates: tuple[datetime, datetime] = (None, None)# start and end datetimes
         self.location: str = ''
-        self.turns: list[Turn] = []
+        self.turns: list[Turn] = [None for _ in range(4)]
         self.current_turn: int = None
         self.description: str = ''
         self.participants: list[Player] = []
         self.player_scores: dict[NationalPlayerID, float] = {}
 
+    def id(self) -> str:
+        return self.tournament_id
+    
+    def set_id(self, id: Hashable):
+        return super().set_id(id)
+    
     def add_participant(self, player: Player) -> bool:
         """Adds a player to the tournament.
 
@@ -159,7 +172,7 @@ class Tournament(EntityABC):
             'participants': [str(p.id()) for p in self.participants], # convert players to their National Player ID
             'dates': [(d.isoformat() if d is not None else None) for d in self.dates],
             'location': str(self.location),
-            'turns': [t.as_dict() for t in self.turns],
+            'turns': [t.as_dict() if t is not None else None for t in self.turns],
             'current_turn': int(self.current_turn) if self.current_turn is not None else None,
             'description': str(self.description),
             'player_scores': {str(score[0]): float(score[1]) for score in self.player_scores.items()}
