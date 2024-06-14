@@ -89,7 +89,7 @@ class utils:
 class TestTournamentJSON(unittest.TestCase):
     """Test JSON encoding and decoding of Tournament entities
     """
-    def test_match_as_dict(self):
+    def test_match_asdict(self):
         """Dump a valid match to dict without failure, and check data is consistent."""
         p1 = utils.make_random_player()
         p2 = utils.make_random_player()
@@ -97,7 +97,7 @@ class TestTournamentJSON(unittest.TestCase):
                                    player2= (p2, 0.0),
                                    start_time=datetime.fromisoformat("2024-05-02 15:45:03"),
                                    end_time=datetime.fromisoformat("2024-05-02 16:17:54"))
-        match_dict = m.as_dict()
+        match_dict = m.asdict()
         self.assertIsInstance(match_dict, dict)
         self.assertEqual(match_dict.get('start_time'), m.start_time.isoformat())
         self.assertEqual(match_dict.get('end_time'), m.end_time.isoformat())
@@ -106,12 +106,12 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertEqual(player_data[0], [str(m.players[0][0].id()), m.players[0][1]])
         self.assertEqual(player_data[1], [str(m.players[1][0].id()), m.players[1][1]])
 
-    def test_turn_as_dict(self):
+    def test_turn_asdict(self):
         """Dump a valid turn to dict without failure, and check data is consistent."""
         match_list = utils.make_matches()
         turn = tournament_model.Turn("test turn", matches= match_list)
 
-        test_dict = turn.as_dict()
+        test_dict = turn.asdict()
         self.assertIsInstance(test_dict, dict)
         self.assertEqual(test_dict.get('name'), turn.name)
         test_dict_matches = test_dict.get('matches')
@@ -135,11 +135,11 @@ class TestTournamentJSON(unittest.TestCase):
                 self.assertEqual(dict_match_m_players[p][0], turn_match_m.players[p][0].id())
                 self.assertEqual(dict_match_m_players[p][1], turn_match_m.players[p][1])
     
-    def test_tournament_as_dict(self):
+    def test_tournament_asdict(self):
         """Export tournament data to a dict object.
         """
         tournament = utils.make_tournament()
-        t_data = tournament.as_dict()
+        t_data = tournament.asdict()
         self.assertIsInstance(t_data, dict)
         t_metadata: dict = t_data.get('metadata')
         self.assertIsInstance(t_metadata, dict)
@@ -155,4 +155,4 @@ class TestTournamentJSON(unittest.TestCase):
             if tournament.turns[t] is None:
                 self.assertIsNone(t_data['turns'][t])
             else:
-                self.assertDictEqual(t_data['turns'][t], tournament.turns[t].as_dict())
+                self.assertDictEqual(t_data['turns'][t], tournament.turns[t].asdict())

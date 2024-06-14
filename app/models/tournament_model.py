@@ -62,7 +62,7 @@ class Match:
         """
         pass
 
-    def as_dict(self) -> dict:
+    def asdict(self) -> dict:
         """Copies the data of this Macth in a new dict object.
         Useful when dumping to JSON, fo instance.
         Note that only the player_ids gets copied, not the entire player objects. 
@@ -100,13 +100,13 @@ class Turn:
         """
         pass
 
-    def as_dict(self) -> dict:
+    def asdict(self) -> dict:
         """Copies the data of this Turn in a new dict object.
         Useful when dumping to JSON, fo instance.
         """
         return {
             'name': str(self.name),
-            'matches': [m.as_dict() for m in self.matches]
+            'matches': [m.asdict() for m in self.matches]
         }
     
 @dataclass
@@ -193,22 +193,22 @@ class Tournament():
     def end_date(self) -> date:
         return self.metadata.end_date
     
-    def as_dict(self) -> dict:
+    def asdict(self) -> dict:
         """Copies all the data of this tournament into a new dict object.
         Useful when exporting to JSON."""
         return {
             'metadata': self.metadata.asdict(),
             'participants': [str(p.id()) for p in self.participants], # convert players to their National Player ID
-            'turns': [t.as_dict() if t is not None else None for t in self.turns],
+            'turns': [t.asdict() if t is not None else None for t in self.turns],
             'current_turn': int(self.current_turn) if self.current_turn is not None else None
         }
 
-class TournamentJSONEncoder(json.JSONEncoder):
+class TournamentMetaDataJSONEncoder(json.JSONEncoder):
     """Encode Tournament object to JSON
     """
-    def default(self, o: Tournament) -> dict:
-        if isinstance(o, Tournament):
-            return o.as_dict()
+    def default(self, o: TournamentMetaData) -> dict:
+        if isinstance(o, TournamentMetaData):
+            return o.asdict()
         else:
             return super().default(o)
 
@@ -216,3 +216,17 @@ class TournamentRepository(JSONRepository):
     def __init__(self, file, player_repo: PlayerRepository):
         super().__init__(file, TournamentJSONEncoder, json.JSONDecoder)
         self.player_repo: PlayerRepository = player_repo
+
+if __name__ == "__main__":
+    from pathlib import Path
+    from app import APPDIR
+    test_path = Path(APPDIR.parent, "tests").resolve()
+    import sys
+    sys.path.append(str(test_path.resolve()))
+    from tests.datamodel.test_tournament_model import utils
+
+    tournament = utils.make_tournament()
+    tournament.asdict()
+    testfile = Path(test_path, 'tmp', 'test_tournament.json')
+    with open(testfile, "w") as json_file:
+        json.dump(tournament.asdict(), json_file, indent= 1)
