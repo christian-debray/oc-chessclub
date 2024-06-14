@@ -35,10 +35,17 @@ class Match:
 
     def start(self, start_time: datetime = None) -> bool:
         """Start the match.
-        Sets the start_time (defaults to now)."""
-        pass
+        Sets the start_time (defaults to now).
+        Fails if the match has already started."""
+        if self.start_time is not None:
+            raise ValueError("Match has already started")
+        if start_time is None:
+            self.start_time = datetime.now()
+        else:
+            self.start_time = start_time
+        return True
 
-    def end(self, winner: NationalPlayerID = None, end_time: datetime = None) -> tuple[tuple[Player, float]]:
+    def end(self, winner: NationalPlayerID = None, end_time: datetime = None) -> tuple[tuple[Player, float], tuple[Player, float]]:
         """Ends the match and set the outcome and returns the player scores.
         
         To declare a draw, set winner parameter to None.
@@ -48,19 +55,61 @@ class Match:
         - victorious player receives 1 point,
         - defeated player receieves 0 point,
         - in case of a draw, both player receive 0.5 point.
+
+        A match that has not started can't be ended (this raises an Exception),
+        but it is still possible to change the outcome of a match that has
+        already ended (in order to fix a mistake, for instance).
         """
-        pass
+        if not self.has_started():
+            raise Exception("Can't end a match that has not started yet.")
+        if end_time is None and self.end_time is None:
+            self.end_time = datetime.now()
+        elif end_time is not None:
+            if end_time <= self.start_time:
+                raise ValueError("Trying to end a match with inconsistent end time.")
+            self.end_time = end_time
+
+        if winner is None:
+            # draw: 0.5 for each player.
+            self.players= ((self.player1(), .5), (self.player2(), .5))
+        elif self.player1().id() == winner:
+            self.players= ((self.player1(), 1.0), (self.player2(), 0))
+        elif self.player2().id() == winner:
+            self.players= ((self.player1(), 0.0), (self.player2(), 1.0))
+        else:
+            raise KeyError("Trying to end a match with wrong Player ID.")
+        
+        return self.scores()
 
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of a player for this match,
         or None if the match is still running.
+        If parameter is None, returns the score of both players.
         """
-        pass
+        if player_id is None:
+            return self.players
+        elif player_id == self.player1().id():
+            return self.players[0][1]
+        elif player_id == self.player2().id():
+            return self.players[1][1]
+        else:
+            raise KeyError("Trying to retrieve match score with a wrong Player ID.")
+    
+    def scores(self) -> tuple[tuple[Player, float], tuple[Player, float]]:
+        """Returns the score for this match.
+        """
+        return self.players
+
+    def has_started(self) -> bool:
+        """Returns True if this match has started.
+        (it may have also ended if True...)
+        """
+        return self.start_time is not None
 
     def has_ended(self) -> bool:
         """Returns True if this match has ended.
         """
-        pass
+        return self.end_time is not None
 
     def asdict(self) -> dict:
         """Copies the data of this Macth in a new dict object.

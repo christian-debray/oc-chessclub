@@ -158,6 +158,8 @@ class TestTournamentJSON(unittest.TestCase):
                 self.assertDictEqual(t_data['turns'][t], tournament.turns[t].asdict())
     
     def test_tournament_metadata_json(self):
+        """Tournament Metadata can be safely exported to JSON and imported from JSON.
+        """
         tournament = utils.make_tournament()
         dump_str = json.dumps(tournament.metadata, cls=tournament_model.TournamentMetaDataJSONEncoder)
         dump_dict = json.loads(dump_str)
@@ -165,3 +167,91 @@ class TestTournamentJSON(unittest.TestCase):
         loaded = json.loads(dump_str, cls=tournament_model.TournamentMetaDataJSONDecoder)
         self.assertIsInstance(loaded, tournament_model.TournamentMetaData)
         self.assertEqual(tournament.metadata, loaded)
+    
+    def test_match_start(self):
+        """Starting a match sets the startime.
+        """
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0))
+        match.start()
+        self.assertIsNotNone(match.start_time)
+        self.assertIsNone(match.end_time)
+        self.assertAlmostEqual(match.start_time.timestamp(), datetime.now().timestamp(), 3)
+
+    @unittest.expectedFailure
+    def test_match_start_failure(self):
+        """Starting a match that has already started should fail.
+        """
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0), start_time= datetime.now())
+        match.start()
+
+    def test_match_end_draw(self):
+        """Ending a match with no Player ID should record a draw.
+        """
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0), start_time= datetime.now())
+        end_time= datetime.fromtimestamp(match.start_time.timestamp() + 1800)
+        match.end(end_time= end_time)
+        self.assertIsNotNone(match.end_time)
+        self.assertEqual(match.scores(), ((p1, .5), (p2, .5)))
+
+    def test_match_end_victory_1(self):
+        """Ending a match with first player ID as winner should set
+        scores accordingly.
+        """
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0), start_time= datetime.now())
+        end_time= datetime.fromtimestamp(match.start_time.timestamp() + 1800)
+        match.end(end_time= end_time, winner= p1.id())
+        self.assertIsNotNone(match.end_time)
+        self.assertEqual(match.scores(), ((p1, 1.0), (p2, 0.0)))
+
+    def test_match_end_victory_2(self):
+        """Ending a match with second player ID as winner should set
+        scores accordingly."""
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0), start_time= datetime.now())
+        end_time= datetime.fromtimestamp(match.start_time.timestamp() + 1800)
+        match.end(end_time= end_time, winner= p2.id())
+        self.assertIsNotNone(match.end_time)
+        self.assertEqual(match.scores(), ((p1, 0.0), (p2, 1.0)))
+
+    @unittest.expectedFailure
+    def test_match_end_fails_with_wrong_id(self):
+        """Ending a match with a wrong Player ID should raise an Exception.
+        """
+        p1 = utils.make_random_player()
+        p1.set_id('FR12345')
+        p2 = utils.make_random_player()
+        p2.set_id('FR22346')
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0), start_time= datetime.now())
+        match.end(winner = "FR76923")
+
+    @unittest.expectedFailure
+    def test_match_end_fails_with_wrong_time(self):
+        """Ending a match with a date prior to start_date should raise an Exception.
+        """
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0), player2= (p2, 0.0), start_time= datetime.now())
+        date_before_start = datetime.fromtimestamp(match.start_time.timestamp() - 0.1)
+        match.end(end_time= date_before_start)
+    
+    def test_match_player_score(self):
+        """A Match object serves the correct player scores.
+        """
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
+        match = tournament_model.Match(player1= (p1, 0.0),
+                                       player2= (p2, 0.0),
+                                       start_time= datetime.fromtimestamp(datetime.now().timestamp() - 1800))
+        match.end(winner = p1.id())
+        self.assertEqual(match.player_score(p1.id()), 1.0)
+        self.assertEqual(match.player_score(p2.id()), 0.0)
+        self.assertEqual(match.scores(), ((p1, 1.0), (p2, 0.0)))
