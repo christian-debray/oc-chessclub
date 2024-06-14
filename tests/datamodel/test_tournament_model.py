@@ -255,3 +255,30 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertEqual(match.player_score(p1.id()), 1.0)
         self.assertEqual(match.player_score(p2.id()), 0.0)
         self.assertEqual(match.scores(), ((p1, 1.0), (p2, 0.0)))
+
+    def test_turn_setup(self):
+        """Setting up a Turn with a list of pairs of players
+        will create as many matches, and no match has started yet."""
+        turn = tournament_model.Turn('a turn')
+        player_pairs = [(utils.make_random_player(), utils.make_random_player()) for _ in range(10)]
+        turn.setup(player_pairs)
+        self.assertEqual(len(turn.matches), len(player_pairs))
+        for m in range(len(turn.matches)):
+            m_match = turn.matches[m]
+            players = player_pairs[m]
+            self.assertEqual(m_match.player1(), players[0])
+            self.assertEqual(m_match.player2(), players[1])
+            self.assertEqual(m_match.scores(), ((players[0], 0.0),(players[1], 0.0)))
+            self.assertEqual(m_match.has_started(), False)
+
+    def test_turn_find_player_match(self):
+        """Find a match i a turn where a player participates.
+        """
+        turn = tournament_model.Turn('a turn')
+        player_pairs = [(utils.make_random_player(), utils.make_random_player()) for _ in range(10)]
+        turn.setup(player_pairs)
+        player = player_pairs[4][1]
+        m = turn.find_player_match(player.id())
+        self.assertIsNotNone(m)
+        self.assertEqual(m, turn.matches[4])
+        self.assertEqual(m.player2(), player)

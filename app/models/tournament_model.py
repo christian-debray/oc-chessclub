@@ -133,21 +133,28 @@ class Turn:
         """Setup a turn that has not started yet.
         Parameter is a list of pairs of players.
         """
-        pass
-    
+        self.matches = []
+        for pair in match_list:
+            self.matches.append(Match(player1= (pair[0], 0.0),
+                                      player2= (pair[1], 0.0)))
+
     def has_started(self) -> bool:
-        """A turn has started if all matches are set up and if at least one match has started.
+        """A turn has started if all matches are set up.
         """
-        pass
+        return len(self.matches) > 0
 
     def has_ended(self) -> bool:
         """Returns True if all matches have ended.
         """
+        return 0 == len(list(filter(lambda x: False == x.has_ended(), self.matches)))
 
     def find_player_match(self, player_id: NationalPlayerID) -> Match:
         """Finds match with player player_id
         """
-        pass
+        for m in self.matches:
+            if player_id in (m.player1().id(), m.player2().id()):
+                return m
+        return None
 
     def asdict(self) -> dict:
         """Copies the data of this Turn in a new dict object.
