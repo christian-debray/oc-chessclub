@@ -19,6 +19,10 @@ class Match:
                  player2: tuple[Player, float],
                  start_time: datetime = None,
                  end_time: datetime= None):
+        if not isinstance(player1[0], Player):
+            raise TypeError(f"Expecting Player object for player1, got {type(player1[0])}")
+        if not isinstance(player2[0], Player):
+            raise TypeError(f"Expecting Player object for player2, got {type(player1[0])}")
         self.players: tuple[tuple[Player, float]] = ((player1[0], player1[1]), (player2[0], player2[1]))
         self.start_time: datetime = start_time
         self.end_time: datetime = end_time
@@ -51,12 +55,24 @@ class Match:
         """Returns True if this match has ended.
         """
         pass
+
+    def as_dict(self) -> dict:
+        """Copies the data of this Macth in a new dict object.
+        Useful when dumping to JSON, fo instance.
+        Note that only the player_ids gets copied, not the entire player objects. 
+        """
+        return {
+            'start_time': self.start_time.isoformat() if self.start_time is not None else None,
+            'end_time': self.end_time.isoformat() if self.end_time is not None else None,
+            'players': [[str(score[0].id()), float(score[1]) if score[1] is not None else None] for score in self.players]
+        }
     
 class Turn:
-
-    def __init__(self):
-        self.name: str
-        self.matches: list[Match] = None
+    """A turn in a tournament.
+    """
+    def __init__(self, name: str = '', matches: list[Match] = None):
+        self.name: str = name
+        self.matches: list[Match] = matches
 
     def setup(self, match_list: list[tuple[Player, Player]]):
         """Setup a turn that has not started yet.
@@ -73,11 +89,20 @@ class Turn:
         """Returns True if all matches have ended.
         """
 
+    def as_dict(self) -> dict:
+        """Copies the data of this Turn in a new dict object.
+        Useful when dumping to JSON, fo instance.
+        """
+        return {
+            'name': str(self.name),
+            'matches': [m.as_dict() for m in self.matches]
+        }
+
 class Tournament(EntityABC):
     def __init__(self):
         self.dates: tuple[datetime, datetime] = (None, None)# start and end datetimes
         self.location: str = ''
-        self.turns: list = []
+        self.turns: list[Turn] = []
         self.current_turn: int = None
         self.description: str = ''
         self.participants: list[Player] = []
@@ -126,66 +151,29 @@ class Tournament(EntityABC):
     
     def end_date(self) -> datetime:
         return self.dates[1]
+    
+    def as_dict(self) -> dict:
+        """Copies all the data of this tournament into a new dict object.
+        Useful when exporting to JSON."""
+        return {
+            'participants': [str(p.id()) for p in self.participants], # convert players to their National Player ID
+            'dates': [(d.isoformat() if d is not None else None) for d in self.dates],
+            'location': str(self.location),
+            'turns': [t.as_dict() for t in self.turns],
+            'current_turn': int(self.current_turn) if self.current_turn is not None else None,
+            'description': str(self.description),
+            'player_scores': {str(score[0]): float(score[1]) for score in self.player_scores.items()}
+        }
 
 
 ###################### JSON Encoders and Decoders ######################
-
-class MatchJSONEncoder(json.JSONEncoder):
-    """Encode Turn data to JSON"""
-    def default(self, o: Match) -> dict:
-        """Encode a Match object to JSON.
-        """
-        if isinstance(o, Match):
-            return {
-                'start_time': o.start_time.isoformat() if o.start_time is not None else None,
-                'end_time': o.end_time.isoformat() if o.end_time is not None else None,
-                'players': [[str(score[0].id()), float(score[1])] for score in o.players]
-            }
-        else:
-            return super().default(o)
-
-
-class MatchJSONDecoder(json.JSONDecoder):
-    """Decode Turn data from JSON"""
-    def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.obj_hook, *args, **kwargs)
-
-    def obj_hook(self, dct):
-        raise NotImplementedError
-
-class TurnJSONEncoder(json.JSONEncoder):
-    """Encode Turn data to JSON"""
-    def default(self, o: Turn) -> dict:
-        if isinstance(o, Turn):
-            return {
-                'name': str(o.name) ,#str
-                'matches': [json.dumps(m, cls=MatchJSONEncoder) for m in o.matches] #list[Match] = None
-            }
-        else:
-            return super().default()
-
-class TurnJSONDecoder(json.JSONDecoder):
-    """Decode Turn data from JSON"""
-    def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.obj_hook, *args, **kwargs)
-
-    def obj_hook(self, dct):
-        raise NotImplementedError
 
 class TournamentJSONEncoder(json.JSONEncoder):
     """Encode Tournament object to JSON
     """
     def default(self, o: Tournament) -> dict:
         if isinstance(o, Tournament):
-            return {
-                'participants': [str(p.id()) for p in o.participants], # convert players to their National Player ID
-                'dates': [(d.isoformat() if d is not None else None) for d in o.dates],
-                'location': str(o.location),
-                'turns': [json.dumps(t, cls= TurnJSONEncoder) for t in o.turns],
-                'current_turn': int(o.current_turn) if o.current_turn is not None else None,
-                'description': str(o.description),
-                'player_scores': {str(score[0]): float(score[1]) for score in o.player_scores.items()}
-            }
+            return o.as_dict()
         else:
             return super().default(o)
 

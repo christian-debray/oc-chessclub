@@ -5,33 +5,80 @@ import app.models.tournament_model as tournament_model
 from datetime import date, datetime
 from pathlib import Path
 import json
+import random
+
+class utils:
+    @staticmethod
+    def randdigits(n: int, min: int = 0, max: int = 9) -> str:
+        """Generates a random numeric string."""
+        t = ""
+        for _ in range(n):
+            t += str(random.randint(min, max))
+        return t
+
+    @staticmethod
+    def randstring(len: int) -> str:
+        """Generates a random string with ASCII capital letters."""
+        return "".join([chr(random.randint(65, 90)) for _ in range(len)])
+
+    @staticmethod
+    def rand_player_id() -> str:
+        """Generates a random national player ID string"""
+        return utils.randstring(2) + utils.randdigits(5)
+    
+    @staticmethod
+    def rand_date() -> str:
+        """Generates a random date string in ISO format"""
+        y = random.randint(1960, 2010)
+        m = random.randint(1, 12)
+        d = random.randint(1, 28)
+        return f"{y}-{m:0>2}-{d:0>2}"
+        
+    @staticmethod
+    def make_random_player() -> player_model.Player:
+        return player_model.Player(
+            national_player_id= player_model.NationalPlayerID(utils.rand_player_id()),
+            name=utils.randstring(8).capitalize(),
+            surname=utils.randstring(8).capitalize(),
+            birthdate=date.fromisoformat(utils.rand_date()))
+
+    @staticmethod
+    def make_matches() -> list[tournament_model.Match]:
+        """Makes a list of matches with random players, in various situations:
+        match 0 ended with a draw
+        match 1 was won by player 1
+        match 2 has started but not ended
+        match 2 has not started
+        """
+        matches: list[tournament_model.Match] = [
+                    tournament_model.Match(player1 = (utils.make_random_player(), 0.5),
+                                            player2 = (utils.make_random_player(), 0.5),
+                                            start_time= datetime.fromisoformat("2024-05-02 15:24:30"),
+                                            end_time= datetime.fromisoformat("2024-05-02 15:44:30")),
+                    tournament_model.Match(player1 = (utils.make_random_player(), 1),
+                                            player2 = (utils.make_random_player(), 0),
+                                            start_time= datetime.fromisoformat("2024-05-02 15:34:25"),
+                                            end_time= datetime.fromisoformat("2024-05-02 15:57:12")),
+                    tournament_model.Match(player1 = (utils.make_random_player(), None),
+                                            player2 = (utils.make_random_player(), None),
+                                            start_time= datetime.fromisoformat("2024-05-02 15:41:02")),
+                    tournament_model.Match(player1 = (utils.make_random_player(), None),
+                                            player2 = (utils.make_random_player(), None)),
+                ]
+        return matches
 
 class TestTournamentJSON(unittest.TestCase):
     """Test JSON encoding and decoding of Tournament entities
     """
-    def test_match_json_encoder(self):
-        """Dump a valid match to JSON string without failure,
-        loading the dump using the default JSONDecoder should produce a dict
-        with match data.
-        """
-        p1 = player_model.Player(
-            national_player_id= player_model.NationalPlayerID('FR12345'),
-            name="Dummy",
-            surname="Player 1",
-            birthdate= date.fromisoformat("1981-01-01"))
-        p2 = player_model.Player(            
-            national_player_id= player_model.NationalPlayerID('FR23456'),
-            name="Dummy",
-            surname="Player 2",
-            birthdate= date.fromisoformat("1982-02-02"))
-
+    def test_match_as_dict(self):
+        """Dump a valid match to dict without failure, and check data is consistent."""
+        p1 = utils.make_random_player()
+        p2 = utils.make_random_player()
         m = tournament_model.Match(player1= (p1, 0.0),
                                    player2= (p2, 0.0),
                                    start_time=datetime.fromisoformat("2024-05-02 15:45:03"),
                                    end_time=datetime.fromisoformat("2024-05-02 16:17:54"))
-        dump_str = json.dumps(m, cls= tournament_model.MatchJSONEncoder)
-        self.assertIsInstance(dump_str, str)
-        match_dict: dict = json.loads(dump_str)
+        match_dict = m.as_dict()
         self.assertIsInstance(match_dict, dict)
         self.assertEqual(match_dict.get('start_time'), m.start_time.isoformat())
         self.assertEqual(match_dict.get('end_time'), m.end_time.isoformat())
@@ -39,3 +86,33 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertIsInstance(player_data, list)
         self.assertEqual(player_data[0], [str(m.players[0][0].id()), m.players[0][1]])
         self.assertEqual(player_data[1], [str(m.players[1][0].id()), m.players[1][1]])
+
+    def test_turn_json_encoder(self):
+        """Dump a valid turn to dict without failure, and check data is consistent."""
+        match_list = utils.make_matches()
+        turn = tournament_model.Turn("test turn", matches= match_list)
+
+        test_dict = turn.as_dict()
+        self.assertIsInstance(test_dict, dict)
+        self.assertEqual(test_dict.get('name'), turn.name)
+        test_dict_matches = test_dict.get('matches')
+        self.assertIsInstance(test_dict_matches, list)
+        match_0: dict = test_dict_matches[0]
+
+        self.assertIsInstance(match_0, dict)
+        self.assertEqual(match_0.get("start_time"), match_list[0].start_time.isoformat())
+        self.assertEqual(match_0.get("end_time"), match_list[0].end_time.isoformat())
+
+        self.assertEqual(len(test_dict_matches), len(turn.matches))
+        for m in range(len(turn.matches)):
+            dict_match_m: dict = test_dict_matches[m]
+            turn_match_m = turn.matches[m]
+            match_start_time = turn_match_m.start_time.isoformat() if turn_match_m.start_time is not None else None
+            match_end_time = turn_match_m.end_time.isoformat() if turn_match_m.end_time is not None else None
+            self.assertEqual(dict_match_m.get('start_time'), match_start_time)
+            self.assertEqual(dict_match_m.get('end_time'), match_end_time)
+            dict_match_m_players: tuple = dict_match_m.get('players')
+            for p in range(len(turn_match_m.players)):
+                self.assertEqual(dict_match_m_players[p][0], turn_match_m.players[p][0].id())
+                self.assertEqual(dict_match_m_players[p][1], turn_match_m.players[p][1])
+
