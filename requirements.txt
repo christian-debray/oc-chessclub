@@ -1,0 +1,4 @@
+ansio==0.0.1
+evdev==1.7.1
+python-xlib==0.33
+six==1.16.0

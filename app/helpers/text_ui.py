@@ -4,11 +4,7 @@ import re
 from typing import Callable
 import os
 from app.helpers import ansi
-# ansio: alpha revision
-# detect keyboard events.
-# see https://github.com/nineteendo/ansio.git
-import ansio
-import ansio.input
+import app
 
 def prompt_v(prompt: str = None, validator: str | Callable = None, not_valid_msg: str = None, skip_blank= False):
     """Prompts user for input and validates the input.
@@ -34,23 +30,6 @@ def prompt_v(prompt: str = None, validator: str | Callable = None, not_valid_msg
         print(" (abandon)")
         return None
 
-def proceed_any_key(msg="Press any key to proceed", timeout: float = None):
-    print(ansi.Formatter.format(msg, ansi.Formatter.CYAN))
-    with ansio.raw_input:
-        evt = ansio.input.get_input_event(timeout=timeout)
-
-def confirm(msg="press Y to confirm", timeout: float = None):
-    """Prompts user to confirm an action y pressing a specific key ('y').
-
-    Returns True if user confirmed, False otherwise."""
-    print(ansi.Formatter.format(msg, ansi.Formatter.CYAN))
-    evt = None
-    with ansio.raw_input:
-        evt = ansio.input.get_input_event(timeout=timeout)
-    if evt:
-        return evt.upper() == 'Y'
-    return False
-
 def clear():
     """Clears the console screen.
 
@@ -60,3 +39,21 @@ def clear():
         _ = os.system('cls')
     else:
         _ = os.system('clear')
+
+if app.KEYBOARD_MODULE == 'ansio':
+    # define alternative methods to promt for confirmation
+    from app.helpers.ansio_ui import ansio, proceed_any_key, confirm
+else:
+    # provide default functions
+
+    def proceed_any_key(msg="Press enter to proceed", timeout: float = None):
+        """Default implementation of a proceed msg.
+        """
+        proceed = input(ansi.Formatter.format(msg, ansi.Formatter.CYAN))
+
+    def confirm(msg="enter Y to confirm", timeout: float = None) -> bool:
+        """Prompts user to confirm an action y entering a specific key ('y').
+
+        Returns True if user confirmed, False otherwise."""
+        confirm = input(ansi.Formatter.format(msg, ansi.Formatter.CYAN))
+        return confirm.upper() == 'Y'
