@@ -134,7 +134,8 @@ class TournamentMetaData(EntityABC):
             "end_date": self.end_date.isoformat() if self.end_date is not None else None,
             "location": str(self.location),
             "description": str(self.description),
-            "data_file": str(self.data_file)
+            "data_file": str(self.data_file),
+            "turn_count": self.turn_count
         }
 
 class Tournament():
@@ -204,7 +205,7 @@ class Tournament():
         }
 
 class TournamentMetaDataJSONEncoder(json.JSONEncoder):
-    """Encode Tournament object to JSON
+    """Encode Tournament metadata object to JSON
     """
     def default(self, o: TournamentMetaData) -> dict:
         if isinstance(o, TournamentMetaData):
@@ -212,9 +213,34 @@ class TournamentMetaDataJSONEncoder(json.JSONEncoder):
         else:
             return super().default(o)
 
+class TournamentMetaDataJSONDecoder(json.JSONDecoder):
+    """Decode a Tournament metadata
+    """
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.obj_hook, *args, **kwargs)
+
+    def obj_hook(self, dct):
+        if 'tournament_id' not in dct:
+            return dct
+        return TournamentMetaData(
+            tournament_id= dct['tournament_id'],
+            start_date= date.fromisoformat(dct['start_date']) if dct['start_date'] is not None else None,
+            end_date= date.fromisoformat(dct['end_date']) if dct['end_date'] is not None else None,
+            location= dct['location'],
+            description= dct['description'],
+            data_file= dct['data_file'],
+            turn_count= int(dct['turn_count'])
+        )
+
+
 class TournamentRepository(JSONRepository):
+    """Tournament metadata is stored in data/tournaments/metadata.json,
+    which stores an index of all known tournaments and the json files with tournament data.
+    data/tournaments/tournament_<tournament_id>.json stores the turn and match data for tournament tournament_id.
+
+    """
     def __init__(self, file, player_repo: PlayerRepository):
-        super().__init__(file, TournamentJSONEncoder, json.JSONDecoder)
+        super().__init__(file, TournamentMetaDataJSONEncoder, json.JSONDecoder)
         self.player_repo: PlayerRepository = player_repo
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ class utils:
     def make_tournament() -> tournament_model.Tournament:
         tournament_meta = tournament_model.TournamentMetaData(
             tournament_id= utils.randstring(5),
-            start_date= datetime.fromisoformat("2024-05-02 15:00:00"),
+            start_date= date.fromisoformat("2024-05-02"),
             end_date= None,
             location = utils.randstring(12),
             description= " ".join([utils.randstring(random.randint(2, 12)) for _ in range(10)]),
@@ -156,3 +156,12 @@ class TestTournamentJSON(unittest.TestCase):
                 self.assertIsNone(t_data['turns'][t])
             else:
                 self.assertDictEqual(t_data['turns'][t], tournament.turns[t].asdict())
+    
+    def test_tournament_metadata_json(self):
+        tournament = utils.make_tournament()
+        dump_str = json.dumps(tournament.metadata, cls=tournament_model.TournamentMetaDataJSONEncoder)
+        dump_dict = json.loads(dump_str)
+        self.assertDictEqual(tournament.metadata.asdict(), dump_dict)
+        loaded = json.loads(dump_str, cls=tournament_model.TournamentMetaDataJSONDecoder)
+        self.assertIsInstance(loaded, tournament_model.TournamentMetaData)
+        self.assertEqual(tournament.metadata, loaded)
