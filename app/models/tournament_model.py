@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import date, datetime
 from app.models.model_baseclasses import EntityABC
 import re
@@ -95,6 +95,11 @@ class Turn:
         """Returns True if all matches have ended.
         """
 
+    def find_player_match(self, player_id: NationalPlayerID) -> Match:
+        """Finds match with player player_id
+        """
+        pass
+
     def as_dict(self) -> dict:
         """Copies the data of this Turn in a new dict object.
         Useful when dumping to JSON, fo instance.
@@ -103,24 +108,42 @@ class Turn:
             'name': str(self.name),
             'matches': [m.as_dict() for m in self.matches]
         }
-
-class Tournament(EntityABC):
-    def __init__(self):
-        self.tournament_id: str
-        self.dates: tuple[datetime, datetime] = (None, None)# start and end datetimes
-        self.location: str = ''
-        self.turns: list[Turn] = [None for _ in range(4)]
-        self.current_turn: int = None
-        self.description: str = ''
-        self.participants: list[Player] = []
-        self.player_scores: dict[NationalPlayerID, float] = {}
-
-    def id(self) -> str:
-        return self.tournament_id
     
+@dataclass
+class TournamentMetaData(EntityABC):
+    """Tournament meta data
+    """
+    tournament_id: str = None
+    start_date: date = None
+    end_date: date = None
+    location: str = ''
+    description: str = ''
+    data_file: str = ''
+    turn_count: int = 4
+
     def set_id(self, id: Hashable):
-        return super().set_id(id)
-    
+        self.tournament_id = id
+
+    def id(self) -> Hashable:
+        return self.tournament_id
+
+    def asdict(self) -> dict:
+        return {
+            "tournament_id": str(self.tournament_id),
+            "start_date": self.start_date.isoformat() if self.start_date is not None else None,
+            "end_date": self.end_date.isoformat() if self.end_date is not None else None,
+            "location": str(self.location),
+            "description": str(self.description),
+            "data_file": str(self.data_file)
+        }
+
+class Tournament():
+    def __init__(self, metadata: TournamentMetaData):
+        self.metadata: TournamentMetaData = metadata
+        self.turns: list[Turn] = [None for _ in range(metadata.turn_count)]
+        self.current_turn: int = None
+        self.participants: list[Player] = []
+   
     def add_participant(self, player: Player) -> bool:
         """Adds a player to the tournament.
 
@@ -138,12 +161,17 @@ class Tournament(EntityABC):
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player
         """
-        return self.player_scores.get(player_id)
+        total = 0
+        for t in self.turns:
+            if t is not None:
+                m = t.find_player_match(player_id=player_id)
+                total += (m.player_score(player_id) or 0)
+        return total
 
     def ranking_list(self) -> list[tuple[Player, float]]:
         """Returns the current ranking list
         """
-        return [(p_id, s) for p_id, s in self.player_scores.items()].sort(key= lambda x: x[1])
+        return [(p, self.player_score(p.id())) for p in self.participants].sort(key= lambda x: x[1])
 
     def start_next_turn(self) -> Turn:
         """Starts next Turn.
@@ -159,27 +187,21 @@ class Tournament(EntityABC):
         """
         pass
 
-    def start_date(self) -> datetime:
-        return self.dates[0]
+    def start_date(self) -> date:
+        return self.metadata.start_date
     
-    def end_date(self) -> datetime:
-        return self.dates[1]
+    def end_date(self) -> date:
+        return self.metadata.end_date
     
     def as_dict(self) -> dict:
         """Copies all the data of this tournament into a new dict object.
         Useful when exporting to JSON."""
         return {
+            'metadata': self.metadata.asdict(),
             'participants': [str(p.id()) for p in self.participants], # convert players to their National Player ID
-            'dates': [(d.isoformat() if d is not None else None) for d in self.dates],
-            'location': str(self.location),
             'turns': [t.as_dict() if t is not None else None for t in self.turns],
-            'current_turn': int(self.current_turn) if self.current_turn is not None else None,
-            'description': str(self.description),
-            'player_scores': {str(score[0]): float(score[1]) for score in self.player_scores.items()}
+            'current_turn': int(self.current_turn) if self.current_turn is not None else None
         }
-
-
-###################### JSON Encoders and Decoders ######################
 
 class TournamentJSONEncoder(json.JSONEncoder):
     """Encode Tournament object to JSON
@@ -190,11 +212,7 @@ class TournamentJSONEncoder(json.JSONEncoder):
         else:
             return super().default(o)
 
-class TournamentJSONDecoder(json.JSONDecoder):
-    """Decode Tournament object from JSON
-    """
-    def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.obj_hook, *args, **kwargs)
-
-    def obj_hook(self, dct):
-        raise NotImplementedError
+class TournamentRepository(JSONRepository):
+    def __init__(self, file, player_repo: PlayerRepository):
+        super().__init__(file, TournamentJSONEncoder, json.JSONDecoder)
+        self.player_repo: PlayerRepository = player_repo

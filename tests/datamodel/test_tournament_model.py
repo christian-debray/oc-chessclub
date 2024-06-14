@@ -69,18 +69,21 @@ class utils:
 
     @staticmethod
     def make_tournament() -> tournament_model.Tournament:
-        tournament = tournament_model.Tournament()
-        tournament.dates = (datetime.fromisoformat("2024-05-02 15:00:00"), None)
-        tournament.description = " ".join([utils.randstring(random.randint(2, 12)) for _ in range(10)])
-        tournament.location = utils.randstring(12)
-
+        tournament_meta = tournament_model.TournamentMetaData(
+            tournament_id= utils.randstring(5),
+            start_date= datetime.fromisoformat("2024-05-02 15:00:00"),
+            end_date= None,
+            location = utils.randstring(12),
+            description= " ".join([utils.randstring(random.randint(2, 12)) for _ in range(10)]),
+            data_file= utils.randstring(8) + ".json",
+            turn_count= 4
+        )
+        tournament = tournament_model.Tournament(tournament_meta)
         match_list = utils.make_matches()
         tournament.turns[0] = tournament_model.Turn("test turn", matches= match_list)
         for m in match_list:
             tournament.participants.append(m.player1())
-            tournament.player_scores[m.player1().id()] = random.randint(0, 3) * .5
             tournament.participants.append(m.player2())
-            tournament.player_scores[m.player2().id()] = random.randint(0, 3) * .5
         return tournament
 
 class TestTournamentJSON(unittest.TestCase):
@@ -138,15 +141,18 @@ class TestTournamentJSON(unittest.TestCase):
         tournament = utils.make_tournament()
         t_data = tournament.as_dict()
         self.assertIsInstance(t_data, dict)
-        self.assertEqual(t_data.get('location'), tournament.location)
-        tournament_dates = [tournament.dates[0].isoformat() if tournament.dates[0] is not None else None,
-                            tournament.dates[1].isoformat() if tournament.dates[1] is not None else None]
-        self.assertEqual(t_data.get('dates'), tournament_dates)
+        t_metadata: dict = t_data.get('metadata')
+        self.assertIsInstance(t_metadata, dict)
+        self.assertEqual(t_metadata.get('location'), tournament.metadata.location)
+        self.assertEqual(t_metadata.get('description'), tournament.metadata.description)
+        self.assertEqual(t_metadata.get('start_date'),
+                         tournament.metadata.start_date.isoformat() if tournament.metadata.start_date is not None else None)
+        self.assertEqual(t_metadata.get('end_date'),
+                         tournament.metadata.end_date.isoformat() if tournament.metadata.end_date is not None else None)
+
         self.assertEqual(len(t_data['turns']), len(tournament.turns))
-        self.assertDictEqual(t_data['player_scores'], tournament.player_scores)
         for t in range(len(tournament.turns)):
             if tournament.turns[t] is None:
                 self.assertIsNone(t_data['turns'][t])
             else:
                 self.assertDictEqual(t_data['turns'][t], tournament.turns[t].as_dict())
-
