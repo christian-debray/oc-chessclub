@@ -68,8 +68,8 @@ class utils:
         return matches
 
     @staticmethod
-    def make_tournament() -> tournament_model.Tournament:
-        tournament_meta = tournament_model.TournamentMetaData(
+    def make_tournament_metadata() -> tournament_model.TournamentMetaData:
+        return tournament_model.TournamentMetaData(
             tournament_id= utils.randstring(5),
             start_date= date.fromisoformat("2024-05-02"),
             end_date= None,
@@ -78,6 +78,10 @@ class utils:
             data_file= utils.randstring(8) + ".json",
             turn_count= 4
         )
+        
+    @staticmethod
+    def make_tournament() -> tournament_model.Tournament:
+        tournament_meta = utils.make_tournament_metadata()
         tournament = tournament_model.Tournament(tournament_meta)
         match_list = utils.make_matches()
         tournament.turns[0] = tournament_model.Turn("test turn", matches= match_list)
@@ -272,7 +276,7 @@ class TestTournamentJSON(unittest.TestCase):
             self.assertEqual(m_match.has_started(), False)
 
     def test_turn_find_player_match(self):
-        """Find a match i a turn where a player participates.
+        """Find a match in a turn where a player participates.
         """
         turn = tournament_model.Turn('a turn')
         player_pairs = [(utils.make_random_player(), utils.make_random_player()) for _ in range(10)]
@@ -282,3 +286,36 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertEqual(m, turn.matches[4])
         self.assertEqual(m.player2(), player)
+
+    def test_add_participant(self):
+        """When adding a new participant, the player's score must equal 0 and the tournament should not have started.
+        """
+        tournament = tournament_model.Tournament(metadata= utils.make_tournament_metadata())
+        players = [utils.make_random_player() for _ in range(10)]
+        for p in players:
+            tournament.add_participant(p)
+            self.assertEqual(tournament.player_score(p.id()), 0.0)
+        self.assertIs(tournament.has_started(), False)
+
+    def test_start_first_turn(self):
+        """Starting the first Turn starts the tournament and sets up matches for all pairs of players.
+        None of the matches has started at this point."""
+        tournament = tournament_model.Tournament(metadata= utils.make_tournament_metadata())
+        players = [utils.make_random_player() for _ in range(10)]
+        check_players ={}
+        for p in players:
+            tournament.add_participant(p)
+            check_players[p.id()] = False # see assignement chekc below
+        tournament.start_next_turn()
+        self.assertIs(tournament.has_started(), True)
+        self.assertIsInstance(tournament.current_turn(), tournament_model.Turn)
+        # 1 match for 2 players
+        self.assertEqual(len(tournament.current_turn().matches), 5)
+        # check all players have been assigned once
+        for m in tournament.current_turn().matches:
+            self.assertIs(m.has_started(), False)
+            self.assertIs(check_players.get(m.player1().id()), False)
+            self.assertIs(check_players.get(m.player2().id()), False)
+            check_players[m.player1().id()] = True
+            check_players[m.player2().id()] = True
+        self.assertEqual(len(list(filter(lambda x: x, check_players.values()))), len(players))

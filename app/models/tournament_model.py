@@ -7,6 +7,7 @@ from _collections_abc import Hashable
 import json
 from app.helpers import validation
 from app.models.player_model import Player, NationalPlayerID, PlayerRepository
+import random
 
 class Match:
     """A Match between opposing two players.
@@ -127,7 +128,7 @@ class Turn:
     """
     def __init__(self, name: str = '', matches: list[Match] = None):
         self.name: str = name
-        self.matches: list[Match] = matches
+        self.matches: list[Match] = matches or []
 
     def setup(self, match_list: list[tuple[Player, Player]]):
         """Setup a turn that has not started yet.
@@ -152,7 +153,7 @@ class Turn:
         """Finds match with player player_id
         """
         for m in self.matches:
-            if player_id in (m.player1().id(), m.player2().id()):
+            if player_id in [m.player1().id(), m.player2().id()]:
                 return m
         return None
 
@@ -198,7 +199,7 @@ class Tournament():
     def __init__(self, metadata: TournamentMetaData):
         self.metadata: TournamentMetaData = metadata
         self.turns: list[Turn] = [None for _ in range(metadata.turn_count)]
-        self.current_turn: int = None
+        self.current_turn_idx: int = None
         self.participants: list[Player] = []
    
     def add_participant(self, player: Player) -> bool:
@@ -206,21 +207,37 @@ class Tournament():
 
         Fails if the tournament has already started.
         """
-        pass
+        if self.has_started():
+            raise Exception("Trying to add a participant when tournament has already started.")
+        if player not in self.participants:
+            self.participants.append(player)
 
     def set_turns(self, turn_count: int = 4) -> bool:
         """Sets how many turns this torunament will last (the default is 4).
 
         Fails if the tournament has already started or ended.
         """
-        pass
+        if self.has_started():
+            raise Exception("Trying to changing turn count when tournament has aldready started.")
+        self.metadata.turn_count = turn_count
+        self.turns = [None for _ in range(self.metadata.turn_count)]
+
+    def has_started(self) -> bool:
+        """Return True if tournament has started.
+        """
+        return self.turns[0] is not None and self.turns[0].has_started()
+    
+    def has_ended(self) -> bool:
+        """Return True if tournament has ended.
+        """
+        return self.turns[-1] is not None and self.turns[-1].has_ended()
 
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player
         """
         total = 0
         for t in self.turns:
-            if t is not None:
+            if t is not None and t.has_started():
                 m = t.find_player_match(player_id=player_id)
                 total += (m.player_score(player_id) or 0)
         return total
@@ -228,21 +245,48 @@ class Tournament():
     def ranking_list(self) -> list[tuple[Player, float]]:
         """Returns the current ranking list
         """
-        return [(p, self.player_score(p.id())) for p in self.participants].sort(key= lambda x: x[1])
+        if self.has_started():
+            ret = [(p, self.player_score(p.id())) for p in self.participants]
+            ret.sort(key= lambda x: x[1])
+            return ret
+        else:
+            return [(p, 0.0) for p in self.participants]
 
     def start_next_turn(self) -> Turn:
         """Starts next Turn.
         
-        Returns None on failure.
-        Fails if the current Turn is still open or if all turns for this tournament
-        have been started.
+        Fails if the current Turn is still open or if the last turn
+        has started or ended.
         """
-        pass
+        if self.current_turn_idx == len(self.turns) - 1:
+            raise Exception("Trying to start new turn after last turn.")
+        if (self.current_turn_idx or 0) > 0 and not self.turns[self.current_turn_idx].has_ended():
+            raise Exception("Trying to start new turn when current turn has not ended.")
+        if self.has_ended():
+            raise Exception("Trying to start new turn after tournament has ended.")
+
+        self.current_turn_idx = self.current_turn_idx + 1 if self.current_turn_idx is not None else 0
+        self.turns[self.current_turn_idx] = Turn(name= f"Round {self.current_turn_idx + 1}")
+        player_pairs = self._make_player_pairs()
+        assert(len(player_pairs) == len(self.participants) / 2)
+        self.turns[self.current_turn_idx].setup(player_pairs)
+    
+    def current_turn(self) -> Turn:
+        """Returns the current turn, if any.
+        Returns None if tournament has ended or not started.
+        """
+        if self.has_ended() or not self.has_started():
+            return None
+        return self.turns[self.current_turn_idx]
 
     def _make_player_pairs(self) -> list[tuple[Player, Player]]:
         """Makes the player pairs for the next turn, basing on their current scores.
         """
-        pass
+        players_list = [r[0] for r in self.ranking_list()]
+        print([str(p.id()) for p in players_list])
+        if self.current_turn_idx == 0:
+            random.shuffle(players_list)
+        return [(players_list[r], players_list[r+1]) for r in range(0, len(players_list), 2)]
 
     def start_date(self) -> date:
         return self.metadata.start_date
@@ -257,7 +301,7 @@ class Tournament():
             'metadata': self.metadata.asdict(),
             'participants': [str(p.id()) for p in self.participants], # convert players to their National Player ID
             'turns': [t.asdict() if t is not None else None for t in self.turns],
-            'current_turn': int(self.current_turn) if self.current_turn is not None else None
+            'current_turn_idx': int(self.current_turn_idx) if self.current_turn_idx is not None else None
         }
 
 class TournamentMetaDataJSONEncoder(json.JSONEncoder):
@@ -312,3 +356,31 @@ if __name__ == "__main__":
     testfile = Path(test_path, 'tmp', 'test_tournament.json')
     with open(testfile, "w") as json_file:
         json.dump(tournament.asdict(), json_file, indent= 1)
+
+    tournament2 = Tournament(TournamentMetaData(tournament_id="tournament_test",
+                                                start_date= datetime.fromisoformat("2024-01-01"),
+                                                location = "paris",
+                                                turn_count= 5))
+    for _ in range(10):
+        tournament2.add_participant(utils.make_random_player())
+    assert(len(tournament2.participants) == 10)
+    for t in range(tournament2.metadata.turn_count):
+        print("starting next turn...")
+        tournament2.start_next_turn()
+        current_turn = tournament2.current_turn()
+        print(f"  turn {current_turn.name} matches:")
+        for m in current_turn.matches:
+            winner = random.choice([None, m.player1().id(), m.player2().id()])
+            print(f"    playing match {m.player1().id()} vs {m.player2().id()}...")
+            m.start()
+            print(f"      => winner: {winner}")
+            scores = m.end(end_time= datetime.fromtimestamp(m.start_time.timestamp() + 1800), winner = winner)
+        print(f"Turn {current_turn.name} ended.")
+        ranking = [(str(x[0].id()), x[1]) for x in tournament2.ranking_list()]
+        ranking.sort(key=lambda x: x[1])
+        print("Ranking after turn: ", ranking)
+        print("Write to file...")
+        testfile = Path(test_path, 'tmp', 'test_tournament.json')
+        with open(testfile, "w") as json_file:
+            json.dump(tournament2.asdict(), json_file, indent= 1)
+    assert(tournament2.has_ended())
