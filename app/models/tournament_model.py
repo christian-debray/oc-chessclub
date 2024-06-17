@@ -1,14 +1,17 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import date, datetime
 from app.models.model_baseclasses import EntityABC
 import re
-from app.adapters.json_storage import JSONRepository
+from app.adapters.json_storage import JSONRepository, JSONStorage
 from _collections_abc import Hashable
 import json
 from app.helpers import validation
 from app.models.player_model import Player, NationalPlayerID, PlayerRepository
 import random
 import logging
+from pathlib import Path
+import uuid
+from app import DATADIR
 
 logger = logging.getLogger()
 
@@ -199,17 +202,47 @@ class TournamentMetaData(EntityABC):
         }
 
 class Tournament():
-    def __init__(self, metadata: TournamentMetaData):
+    def __init__(self, metadata: TournamentMetaData, participants: list[Player] = None, turns: list[Turn] = None, current_turn: int = None):
+        """Create a Tournament.
+        
+        - metadata:
+        - particpants:
+        - turns:
+        - current_turn:
+        """
+        if participants is not None and len(participants) % 2 > 0:
+            raise ValueError("Tournament requires even number of participants; uneven list given.")
+        if turns is not None and len(turns) != metadata.turn_count:
+            raise ValueError("Turn count mismatch.")
         self.metadata: TournamentMetaData = metadata
-        self.turns: list[Turn] = [None for _ in range(metadata.turn_count)]
-        self.current_turn_idx: int = None
-        self.participants: list[Player] = []
+        self.turns: list[Turn] = turns or [None for _ in range(metadata.turn_count)]
+        self.current_turn_idx: int = current_turn
+        self.participants: list[Player] = participants or []
+
         # utility: keep track of oppenents met during the tournament to avoid
         # repetitive matches.
         self._player_opponents: dict[NationalPlayerID, list[NationalPlayerID]] = {}
+        for p in self.participants:
+            self._player_opponents[p.id()] = []
         # utility
         self.player_ranks: dict[NationalPlayerID, tuple[int, float]] = {}
+        
+        # update _player_opponents_data
+        for trn in self.turns:
+            if trn is None:
+                continue
+            for mtch in trn.matches:
+                self._player_opponents[mtch.player1().id()].append(mtch.player2().id())
+                self._player_opponents[mtch.player2().id()].append(mtch.player1().id())
+
+        self.update_score_board()
+
+    def id(self) -> str:
+        return self.metadata.id()
    
+    def set_id(self, new_id: str):
+        self.metadata.set_id(new_id)
+
     def add_participant(self, player: Player) -> bool:
         """Adds a player to the tournament.
 
@@ -240,6 +273,14 @@ class Tournament():
         """Return True if tournament has ended.
         """
         return self.turns[-1] is not None and self.turns[-1].has_ended()
+    
+    def update_end_date(self):
+        """Update the end date of this tournament.
+        """
+        if self.has_ended() and self.metadata.end_date is None:
+            # find latest endtime in last turn
+            end_datetime = min([m.end_time for m in self.turns[-1].matches])
+            self.metadata.end_date = date(year= end_datetime.year, month= end_datetime.month, day= end_datetime.day)
 
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player
@@ -416,10 +457,11 @@ class Tournament():
         """Copies all the data of this tournament into a new dict object.
         Useful when exporting to JSON."""
         return {
+            'tournament_id': self.id(),
             'metadata': self.metadata.asdict(),
             'participants': [str(p.id()) for p in self.participants], # convert players to their National Player ID
-            'turns': [t.asdict() if t is not None else None for t in self.turns],
-            'current_turn_idx': int(self.current_turn_idx) if self.current_turn_idx is not None else None
+            'current_turn_idx': int(self.current_turn_idx) if self.current_turn_idx is not None else None,
+            'turns': [t.asdict() if t is not None else None for t in self.turns]
         }
 
 class TournamentMetaDataJSONEncoder(json.JSONEncoder):
@@ -451,15 +493,140 @@ class TournamentMetaDataJSONDecoder(json.JSONDecoder):
         )
 
 
-class TournamentRepository(JSONRepository):
+class TournamentRepository:
     """Tournament metadata is stored in data/tournaments/metadata.json,
     which stores an index of all known tournaments and the json files with tournament data.
-    data/tournaments/tournament_<tournament_id>.json stores the turn and match data for tournament tournament_id.
+    data/tournaments/tournament_<tournament_id>.json stores the participants, turn and match data for tournament tournament_id.
 
     """
-    def __init__(self, file, player_repo: PlayerRepository):
-        super().__init__(file, TournamentMetaDataJSONEncoder, json.JSONDecoder)
+    def __init__(self, metadata_file: str | Path, player_repo: PlayerRepository):
+        self._tournament_dir = Path(Path(metadata_file).parent).resolve()
+        self._metadata_repo = JSONRepository(metadata_file, encoder= TournamentMetaDataJSONEncoder, decoder= TournamentMetaDataJSONDecoder)
+        # link to json file storing tournament details
         self.player_repo: PlayerRepository = player_repo
+        self._tournament_data: dict[str, Tournament] = {}
+    
+    def list_tournament_meta(self) -> list[TournamentMetaData]:
+        return self._metadata_repo.list_all()
+
+    def find_tournament_metadata(self, **filters) -> list[TournamentMetaData]:
+        return self._metadata_repo.find_many(**filters)
+    
+    def find_tournament_metadata_by_id(self, tournament_id) -> TournamentMetaData:
+        return self._metadata_repo.find_by_id(tournament_id)
+    
+    def add_tournament_metadata(self, metadata: TournamentMetaData):
+        if not metadata.id():
+            metadata.set_id(self.gen_tournament_id())
+        self._metadata_repo.add(metadata)
+
+    def store_tournament(self, tournament: Tournament) -> bool:
+        """Store a tournament.
+        Tournament metadata is stored in a unique file with all other tournament metadata objects,
+        while tournament turns data is stored in separate files in the data/tournaments folder.
+        Tournament turn data files are named after the tournament id.
+        """
+        if not tournament.id() or not tournament.metadata.id():
+            tournament.set_id(self.gen_tournament_id())
+        if not tournament.metadata.data_file:
+            tournament.metadata.data_file = tournament.id() + ".json"
+        if not tournament.id() in self._tournament_data:
+            self._tournament_data[tournament.id()] = tournament
+        if not self.find_tournament_metadata_by_id(tournament.metadata.id()):
+            self._metadata_repo.add(tournament.metadata)
+        else:
+            self._metadata_repo.update(tournament.metadata)
+        self._metadata_repo.commit_changes()
+        tournament_dump_data = tournament.asdict()
+        o_file = Path(self._tournament_dir, tournament.metadata.data_file)
+        with open(o_file, "w", encoding="utf8") as json_file:
+            json.dump(tournament_dump_data, json_file, indent=True)
+        return True
+
+    def gen_tournament_id(self) -> str:
+        """Generates a UUID to identify a tournament.
+        """
+        return str(uuid.uuid4())
+
+    def find_tournament_by_id(self, tournament_id) -> Tournament:
+        """Find a tournament with full data by its id.
+        """
+        if tournament_id in self._tournament_data:
+            return self._tournament_data.get(tournament_id)
+        else:
+            return self.load_tournament(tournament_id)
+
+    def load_tournament(self, tournament_id) -> Tournament:
+        """Loads a tournament from file (if found)
+        """
+        meta = self.find_tournament_metadata_by_id(tournament_id= tournament_id)
+        if not meta:
+            return None
+        tournament_file = Path(self._tournament_dir, meta.data_file)
+        if not tournament_file.exists():
+            # Empty tournament
+            self._tournament_data[tournament_id] = Tournament(metadata= meta)
+            return self._tournament_data[tournament_id]
+
+        # load data from a JSON:
+        with open(tournament_file, "r", encoding="utf8") as json_file:
+            data: dict = json.load(json_file)
+        if data.get('tournament_id') != tournament_id:
+            raise KeyError("Unexpected or missing tournament id while loading tournament data file.")
+        current_turn = int(data.get('current_turn_idx')) if data.get('current_turn_idx') is not None else None
+        # otherwise, load participants and turn data:
+        participants_index = self._load_participants(data.get("participants"))
+        turns = []
+        for t in data.get('turns'):
+            if t is None:
+                turns.append(None)
+            else:
+                turns.append(self._load_turn(data= t, participants_index= participants_index))
+        self._tournament_data[tournament_id] = Tournament(metadata=meta,
+                                                            participants= list(participants_index.values()),
+                                                            turns = turns,
+                                                            current_turn= current_turn)
+        return self._tournament_data[tournament_id]
+        
+
+    def _load_turn(self, data: dict, participants_index: dict[str, Player]):
+        """Load a turn data from a dict.
+        """
+        if not data:
+            return None
+        turn_name = data.get('name', '')
+        matches_data: list[dict] = data.get('matches', [])
+        matches: list[Match] = []
+        for m_d in matches_data:
+            start_time = None
+            if d := m_d.get('start_time'):
+                start_time = datetime.fromisoformat(d)
+            end_time = None
+            if d := m_d.get('end_time'):
+                end_time = datetime.fromisoformat(d)
+            player_data = m_d.get('players')
+            player1 = participants_index.get(player_data[0][0])
+            player1_score = float(player_data[0][1])
+            player2 = participants_index.get(player_data[1][0])
+            player2_score = float(player_data[1][1])
+            matches.append(Match(player1= (player1, player1_score),
+                                 player2= (player2, player2_score),
+                                 start_time= start_time,
+                                 end_time= end_time))
+        return Turn(name= turn_name, matches= matches)
+
+    def _load_participants(self, data: list[str]) -> dict[NationalPlayerID, Player]:
+        """Load participants data from a dict.
+        """
+        player_list = {}
+        for player_id_str in data:
+            if pl := self.player_repo.find_by_id(player_id_str):
+                if player_id_str in player_list:
+                    raise KeyError("Duplicate Player ID in participants data")
+                player_list[player_id_str] = pl
+            else:
+                raise KeyError("Player ID not found in repository")
+        return player_list
 
 if __name__ == "__main__":
     from pathlib import Path
@@ -470,38 +637,71 @@ if __name__ == "__main__":
     sys.path.append(str(test_path.resolve()))
     from tests.datamodel.test_tournament_model import utils
 
-    tournament = utils.make_tournament()
-    tournament.asdict()
-    testfile = Path(test_path, 'tmp', 'test_tournament.json')
-    with open(testfile, "w") as json_file:
-        json.dump(tournament.asdict(), json_file, indent= 1)
-
-    tournament2 = Tournament(TournamentMetaData(tournament_id="tournament_test",
-                                                start_date= datetime.fromisoformat("2024-01-01"),
-                                                location = "paris",
-                                                turn_count= 50))
-    for _ in range(50):
-        tournament2.add_participant(utils.make_random_player())
-    for t in range(tournament2.metadata.turn_count):
-        print("starting next turn...")
+    test_datadir = Path(test_path, 'tmp', 'data')
+    test_p_file = Path(test_datadir, "players.json")
+    test_t_data_dir = Path(test_datadir, 'tournaments')
+    test_meta_file = Path(test_t_data_dir, "test_tournament_metadata.json")
+    
+    player_repo = PlayerRepository(test_p_file)
+    tournament_repo = TournamentRepository(metadata_file= test_meta_file, player_repo= player_repo)
+    tournament_id = random.choice(["tournament_test", None, None])
+    tournament = None
+    if tournament_id:
+        tournament = tournament_repo.find_tournament_by_id(tournament_id= tournament_id)
+        logger.info(f"Re-using tournament id {tournament_id}")
+    else:
+        logger.info("New tournament")
+    if tournament is None:
+        tournament = Tournament(TournamentMetaData(tournament_id=tournament_id,
+                                                    start_date= date.fromisoformat("2024-01-01"),
+                                                    location = "paris",
+                                                    turn_count= 6))
+        logger.info("Storing Tournament data...")
+        tournament_repo.store_tournament(tournament)
+        logger.info(f"Tournament data stored with id = {tournament.id()}")
+        tournament_id = tournament.id()
+        for _ in range(10):
+            player = utils.make_random_player()
+            player_repo.add(player)
+            tournament.add_participant(player)
+            tournament_repo.store_tournament(tournament)
+        logger.info("Storing particpants data...")
+        player_repo.commit_changes()
+    
+    if not tournament.has_started():
+        for t in range(tournament.metadata.turn_count - 1):
+            logger.debug("starting next turn...")
+            current_turn = tournament.start_next_turn()
+            print(f"starting {current_turn.name}...")
+            logger.debug(f"  turn {current_turn.name} matches:")
+            for m in current_turn.matches:
+                winner = random.choice([None, m.player1().id(), m.player2().id()])
+                logger.debug(f"    playing match {m.player1().id()} vs {m.player2().id()}...")
+                m.start()
+                logger.debug(f"      => winner: {winner}")
+                scores = m.end(end_time= datetime.fromtimestamp(m.start_time.timestamp() + 1800), winner = winner)
+            logger.debug(f"Turn {current_turn.name} ended.")
+            tournament.update_score_board()
+            ranking = tournament.ranking_list()
+            ranking.sort(key=lambda x: x[1])
+            ranking_str = ", ".join([f"[{str(x[0])}: #{x[1]} ({x[2]})]" for x in ranking])
+            logger.debug("Ranking after turn: ", ranking_str)
+            logger.debug("Ranking after turn:\n" + ranking_str)
+            logger.debug("Write to file...")
+            tournament.update_end_date()
+            tournament_repo.store_tournament(tournament)
+        print("Done")
+        assert(tournament.has_ended() is False)
+        del tournament_repo
+        del tournament
+    
+    tournament_repo2 = TournamentRepository(metadata_file= test_meta_file, player_repo= player_repo)
+    tournament2 = tournament_repo2.find_tournament_by_id(tournament_id=tournament_id)
+    assert(tournament2 is not None)
+    assert(tournament2.has_started())
+    assert(not tournament2.has_ended())
+    tournament2.metadata.description = "some random description: " + utils.randstring(20) + "\n inserted at " + datetime.now().isoformat()
+    tournament_repo2.store_tournament(tournament2)
+    if not tournament2.current_turn().has_started():
         tournament2.start_next_turn()
-        current_turn = tournament2.current_turn()
-        print(f"  turn {current_turn.name} matches:")
-        for m in current_turn.matches:
-            winner = random.choice([None, m.player1().id(), m.player2().id()])
-            print(f"    playing match {m.player1().id()} vs {m.player2().id()}...")
-            m.start()
-            print(f"      => winner: {winner}")
-            scores = m.end(end_time= datetime.fromtimestamp(m.start_time.timestamp() + 1800), winner = winner)
-        print(f"Turn {current_turn.name} ended.")
-        tournament2.update_score_board()
-        ranking = tournament2.ranking_list()
-        ranking.sort(key=lambda x: x[1])
-        ranking_str = ", ".join([f"[{str(x[0])}: #{x[1]} ({x[2]})]" for x in ranking])
-        print("Ranking after turn: ", ranking_str)
-        logger.debug("Ranking after turn:\n" + ranking_str)
-        print("Write to file...")
-        testfile = Path(test_path, 'tmp', 'test_tournament.json')
-        with open(testfile, "w") as json_file:
-            json.dump(tournament2.asdict(), json_file, indent= 1)
-    assert(tournament2.has_ended())
+

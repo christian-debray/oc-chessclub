@@ -19,6 +19,8 @@ class JSONStorage(MutableMapping):
         if self._file.exists():
             self.load_store()
         else:
+            if not self._file.parent.exists():
+                self._file.parent.mkdir(mode= 0o777, parents=True, exist_ok= True)
             # check now we have proper access to the file:
             self._file.touch(mode= 0o777)
             self._file.unlink()
