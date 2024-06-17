@@ -68,7 +68,7 @@ class utils:
         return matches
 
     @staticmethod
-    def make_tournament_metadata() -> tournament_model.TournamentMetaData:
+    def make_tournament_metadata(turns: int = 4) -> tournament_model.TournamentMetaData:
         return tournament_model.TournamentMetaData(
             tournament_id= utils.randstring(5),
             start_date= date.fromisoformat("2024-05-02"),
@@ -76,7 +76,7 @@ class utils:
             location = utils.randstring(12),
             description= " ".join([utils.randstring(random.randint(2, 12)) for _ in range(10)]),
             data_file= utils.randstring(8) + ".json",
-            turn_count= 4
+            turn_count= turns
         )
         
     @staticmethod
@@ -319,3 +319,45 @@ class TestTournamentJSON(unittest.TestCase):
             check_players[m.player1().id()] = True
             check_players[m.player2().id()] = True
         self.assertEqual(len(list(filter(lambda x: x, check_players.values()))), len(players))
+    
+    def test_match_making(self):
+        """When assigning players to matches, avoid repeating matches played before.
+        """
+        #
+        # To perfrom this test,
+        # we'll forge the first two turns to force a situation where
+        # all players have the same score and rank. 
+        #
+        tournament = tournament_model.Tournament(metadata= utils.make_tournament_metadata())
+        player_names = [(x*3).capitalize() for x in "ABCDEF"]
+        for p in range(len(player_names)):
+            tournament.add_participant(player_model.Player(
+                national_player_id= player_model.NationalPlayerID(f"PL{p:0>5}"),
+                surname= player_names[p],
+                name = player_names[p],
+                birthdate=date.today()
+            ))
+        pairs = [(tournament.participants[p], tournament.participants[p+1]) for p in range(0, len(tournament.participants), 2)]
+        self.assertEqual(len(pairs), len(tournament.participants)/2)
+        tournament.start_next_turn(player_pairs= pairs)
+        for match in tournament.current_turn().matches:
+            match.start()
+            match.end()
+        tournament.update_score_board()
+        expected_ranklist = [
+            (tournament.participants[0].id(), 1, 0.5),
+            (tournament.participants[1].id(), 1, 0.5),
+            (tournament.participants[2].id(), 1, 0.5),
+            (tournament.participants[3].id(), 1, 0.5),
+            (tournament.participants[4].id(), 1, 0.5),
+            (tournament.participants[5].id(), 1, 0.5),
+            ]
+        self.assertListEqual(expected_ranklist, tournament.ranking_list())
+
+        # play the same matches, but this time player 2 wins to even the scores.
+        for p1, p2 in pairs:
+            self.assertEqual(tournament._can_play(p1.id(), p2.id()), .5)
+        new_pairs = tournament._make_player_pairs()
+        for p1, p2 in new_pairs:
+            self.assertEqual(tournament._can_play(p1.id(), p2.id()), 1.0)
+        

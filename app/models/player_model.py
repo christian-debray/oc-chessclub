@@ -37,6 +37,9 @@ class NationalPlayerID(Hashable):
     
     def __eq__(self, value: object) -> bool:
         return self._val.__eq__(value)
+    
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 @dataclass

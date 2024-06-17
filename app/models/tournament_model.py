@@ -244,11 +244,11 @@ class Tournament():
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player
         """
-        total = 0
+        total = 0.0
         for t in self.turns:
             if t is not None and t.has_started():
                 m = t.find_player_match(player_id=player_id)
-                total += (m.player_score(player_id) or 0)
+                total += (m.player_score(player_id) or 0.0)
         return total
 
     def ranking_list(self) -> list[tuple[NationalPlayerID, int, float]]:
@@ -256,13 +256,10 @@ class Tournament():
         """
         if self.has_started():
             return [(pid, rank, score) for (pid, (rank, score)) in self.player_ranks.items()]
-            ret = [(p, self.player_score(p.id())) for p in self.participants]
-            ret.sort(key= lambda x: x[1])
-            return ret
         else:
-            return [(p, 0.0) for p in self.participants]
+            return [(p, 1, 0.0) for p in self.participants]
 
-    def start_next_turn(self) -> Turn:
+    def start_next_turn(self, player_pairs: list[tuple[Player, Player]] = None) -> Turn:
         """Starts next Turn.
         
         Fails if the current Turn is still open or if the last turn
@@ -279,11 +276,13 @@ class Tournament():
 
         self.current_turn_idx = self.current_turn_idx + 1 if self.current_turn_idx is not None else 0
         self.turns[self.current_turn_idx] = Turn(name= f"Round {self.current_turn_idx + 1}")
-        player_pairs = self._make_player_pairs()
+        if player_pairs is None:
+            player_pairs = self._make_player_pairs()
         self.turns[self.current_turn_idx].setup(player_pairs)
         for p1, p2 in player_pairs:
             self._player_opponents[p1.id()].append(p2.id())
             self._player_opponents[p2.id()].append(p1.id())
+        return self.current_turn()
     
     def current_turn(self) -> Turn:
         """Returns the current turn, if any.
