@@ -8,6 +8,9 @@ import json
 from app.helpers import validation
 from app.models.player_model import Player, NationalPlayerID, PlayerRepository
 import random
+import logging
+
+logger = logging.getLogger()
 
 class Match:
     """A Match between opposing two players.
@@ -201,6 +204,11 @@ class Tournament():
         self.turns: list[Turn] = [None for _ in range(metadata.turn_count)]
         self.current_turn_idx: int = None
         self.participants: list[Player] = []
+        # utility: keep track of oppenents met during the tournament to avoid
+        # repetitive matches.
+        self._player_opponents: dict[NationalPlayerID, list[NationalPlayerID]] = {}
+        # utility
+        self.player_ranks: dict[NationalPlayerID, tuple[int, float]] = {}
    
     def add_participant(self, player: Player) -> bool:
         """Adds a player to the tournament.
@@ -211,6 +219,7 @@ class Tournament():
             raise Exception("Trying to add a participant when tournament has already started.")
         if player not in self.participants:
             self.participants.append(player)
+            self._player_opponents[player.id()] = []
 
     def set_turns(self, turn_count: int = 4) -> bool:
         """Sets how many turns this torunament will last (the default is 4).
@@ -242,10 +251,11 @@ class Tournament():
                 total += (m.player_score(player_id) or 0)
         return total
 
-    def ranking_list(self) -> list[tuple[Player, float]]:
+    def ranking_list(self) -> list[tuple[NationalPlayerID, int, float]]:
         """Returns the current ranking list
         """
         if self.has_started():
+            return [(pid, rank, score) for (pid, (rank, score)) in self.player_ranks.items()]
             ret = [(p, self.player_score(p.id())) for p in self.participants]
             ret.sort(key= lambda x: x[1])
             return ret
@@ -264,12 +274,16 @@ class Tournament():
             raise Exception("Trying to start new turn when current turn has not ended.")
         if self.has_ended():
             raise Exception("Trying to start new turn after tournament has ended.")
+        if len(self.participants) % 2 > 0:
+            raise ValueError("Even participant number required.")
 
         self.current_turn_idx = self.current_turn_idx + 1 if self.current_turn_idx is not None else 0
         self.turns[self.current_turn_idx] = Turn(name= f"Round {self.current_turn_idx + 1}")
         player_pairs = self._make_player_pairs()
-        assert(len(player_pairs) == len(self.participants) / 2)
         self.turns[self.current_turn_idx].setup(player_pairs)
+        for p1, p2 in player_pairs:
+            self._player_opponents[p1.id()].append(p2.id())
+            self._player_opponents[p2.id()].append(p1.id())
     
     def current_turn(self) -> Turn:
         """Returns the current turn, if any.
@@ -279,14 +293,119 @@ class Tournament():
             return None
         return self.turns[self.current_turn_idx]
 
+    def update_score_board(self) -> list[tuple[Player, int, float]]:
+        """Maintain a scores board and score ranks.
+        """
+        score_board: dict[float, list[Player]] = {}
+        scores: list[float] = []
+        player_scores = {}
+        for p in self.participants:
+            score = self.player_score(p.id())
+            player_scores[p.id()] = score
+            if score not in score_board:
+                score_board[score] = [p]
+                scores.append(score)
+            else:
+                score_board[score].append(p)
+        
+        scores.sort(reverse= True)
+        rank_list = []
+        for s_idx in range(len(scores)):
+            score = scores[s_idx]
+            for p in score_board[score]:
+                self.player_ranks[p.id()] = (s_idx + 1, score)
+                rank_list.append((p, s_idx +1, score))
+        return rank_list
+
+    def player_rank(self, player_id: NationalPlayerID) -> int:
+        """Rank start from 1 (highest scores).
+        The higher the rank, the lower the score.
+        """
+        return self.player_ranks.get(player_id, (None, None))[0]
+
     def _make_player_pairs(self) -> list[tuple[Player, Player]]:
         """Makes the player pairs for the next turn, basing on their current scores.
+
+        - Avoid repeated matches between turns.
+        - Randomize pairs whenever possible.
         """
-        players_list = [r[0] for r in self.ranking_list()]
-        print([str(p.id()) for p in players_list])
-        if self.current_turn_idx == 0:
-            random.shuffle(players_list)
-        return [(players_list[r], players_list[r+1]) for r in range(0, len(players_list), 2)]
+        if not self.has_started():
+            player_order = [p for p in self.participants]
+            random.shuffle(player_order)
+            return [(player_order[p], player_order[p+1]) for p in range(0, len(player_order), 2)]
+
+        logger.debug(f"Making player pairs for turn {self.current_turn_idx}...")
+        # we just base on ranking list to start with
+        ranking_list = self.update_score_board()
+        recurring_matches: list[int] = []
+        pairs: list[tuple[Player, Player]] = []
+        # make the pairs using a naive approach first,
+        # simply by following the ranking list.
+        for r in range(len(ranking_list)):
+            player = ranking_list[r][0]
+            if r%2 == 0:
+                matching_player = ranking_list[r+1][0]
+                logger.debug(f"Match {len(pairs)}: {player.id()} vs {matching_player.id()}, quality = {self._can_play(player.id(), matching_player.id())}")
+                pairs.append((player, matching_player))
+                if matching_player.id() in self._player_opponents.get(player.id()):
+                    # these two players already met before, we'll try to fix this later
+                    # (see below)
+                    recurring_matches.append(len(pairs) - 1)
+                    logger.debug(f"  ! Recurring pair at match {len(pairs) - 1}: ({player.id()}, {matching_player.id()})")
+
+        if len(recurring_matches) > 0:
+            logger.debug(f'Try to solve {len(recurring_matches)} recurring matches...')
+
+            # try to solve recurring matches by swaping participants of compatible matches
+            # given the player pairs (a,b) and (c,d)
+            # check if ((a,d), (b,c)) or ((a,c), (b,d)) are acceptable solutions.
+            while len(recurring_matches) > 0:
+                i = recurring_matches.pop()
+                player1 = pairs[i][0]
+                player2 = pairs[i][1]
+                current_quality = self._can_play(player1.id(), player2.id())
+                if current_quality == 1:
+                    logger.debug(f"Match {i} is already resolved, skip.")
+                    continue
+                logger.debug(f"Try to solve match {i} ({player1.id()} vs {player2.id()}, quality={round(current_quality, 2)})")
+                # limit search to immediate vicinity
+                for alt_i in [j for j in [i-1, i+1, i-2, i+2] if j != i and j > 0 and j < len(pairs)]:
+                    player3 = pairs[alt_i][0]
+                    player4 = pairs[alt_i][1]
+                    logger.debug(f"   try {alt_i} ({player3.id()} vs {player4.id()})")
+                    # (player1, player3) + (player2, player4)
+                    if self._can_play(player1.id(), player3.id()) > current_quality\
+                            and self._can_play(player2.id(), player4.id()) > current_quality:
+                        # we can safely swap players
+                        pairs[i] = (player1, player3)
+                        pairs[alt_i] = (player2, player4)
+                        logger.debug(f" => Found a solution: swap with match {alt_i}, (player1, player3) + (player2, player4)")
+                        break
+                    # (player1, player4) + (player2, player3)
+                    elif self._can_play(player1.id(), player4.id()) > current_quality\
+                            and self._can_play(player2.id(), player3.id()) > current_quality:
+                        pairs[i] = (player1, player4)
+                        pairs[alt_i] = (player2, player3)
+                        logger.debug(f" => Found a solution: swap with match {alt_i}, (player1, player4) + (player2, player3)")
+                        break
+        logger.debug(f"Pairs = " + ", ".join([f"({p1.id()}, {p2.id()})" for p1, p2 in pairs]))
+        return pairs
+    
+
+    def _can_play(self, player1_id: NationalPlayerID, player2_id: NationalPlayerID) -> float:
+        """Check if two players may play together.
+        Return 0 if the players ranks ar incompatible.
+        returns an float value above 0 otherwise.
+        value is below 0 if both players have already played before.
+        """
+        player1_rank = self.player_rank(player1_id)
+        player2_rank = self.player_rank(player2_id)
+
+        if player1_rank in [player2_rank - 1, player2_rank, player2_rank + 1]:
+            encounters = len([i for i, x in enumerate(self._player_opponents.get(player2_id, [])) if x == player1_id])
+            return 1 / (1 + encounters)
+        else:
+            return 0
 
     def start_date(self) -> date:
         return self.metadata.start_date
@@ -346,6 +465,7 @@ class TournamentRepository(JSONRepository):
 if __name__ == "__main__":
     from pathlib import Path
     from app import APPDIR
+    logging.basicConfig(filename=Path(APPDIR, "debug.log"), level=logging.DEBUG)
     test_path = Path(APPDIR.parent, "tests").resolve()
     import sys
     sys.path.append(str(test_path.resolve()))
@@ -360,10 +480,9 @@ if __name__ == "__main__":
     tournament2 = Tournament(TournamentMetaData(tournament_id="tournament_test",
                                                 start_date= datetime.fromisoformat("2024-01-01"),
                                                 location = "paris",
-                                                turn_count= 5))
-    for _ in range(10):
+                                                turn_count= 50))
+    for _ in range(50):
         tournament2.add_participant(utils.make_random_player())
-    assert(len(tournament2.participants) == 10)
     for t in range(tournament2.metadata.turn_count):
         print("starting next turn...")
         tournament2.start_next_turn()
@@ -376,9 +495,12 @@ if __name__ == "__main__":
             print(f"      => winner: {winner}")
             scores = m.end(end_time= datetime.fromtimestamp(m.start_time.timestamp() + 1800), winner = winner)
         print(f"Turn {current_turn.name} ended.")
-        ranking = [(str(x[0].id()), x[1]) for x in tournament2.ranking_list()]
+        tournament2.update_score_board()
+        ranking = tournament2.ranking_list()
         ranking.sort(key=lambda x: x[1])
-        print("Ranking after turn: ", ranking)
+        ranking_str = ", ".join([f"[{str(x[0])}: #{x[1]} ({x[2]})]" for x in ranking])
+        print("Ranking after turn: ", ranking_str)
+        logger.debug("Ranking after turn:\n" + ranking_str)
         print("Write to file...")
         testfile = Path(test_path, 'tmp', 'test_tournament.json')
         with open(testfile, "w") as json_file:
