@@ -1,32 +1,52 @@
 from app.models.player_model import PlayerRepository, Player
-from app.views.player.player_views import PlayerEditor, PlayerView
-from app.controllers.controller_abc import BaseController, MenuController
+from app.controllers.controller_abc import BaseController, MainController
+from app.commands import commands_abc, commands
+from app.views.menu import Menu, MenuOption
+from app.views.player.player_views import PlayerEditor, PlayerListView
 import logging
 
 logger = logging.getLogger()
 
 
-class PlayerManager(BaseController):
-    def __init__(self, player_repo: PlayerRepository):
-        super().__init__()
-        self.player_repo: PlayerRepository = player_repo
-        self._make_menu()
+class PlayerManagerMenu(Menu):
+    """Player Manager Menu"""
+    def __init__(self, cmdManager: commands_abc.CommandManagerInterface = None):
+        super().__init__(title="Manage Players",
+                         options=None,
+                         cmdManager=cmdManager)
+        self.add_option(MenuOption(option_text="Register New Player",
+                                   command=commands.LaunchManagerCommand(
+                                       app=self.cmd_manager,
+                                       cls_or_obj=PlayerManager,
+                                       method=PlayerManager.register_new_player)))
+        self.add_option(MenuOption(option_text="Edit Player",
+                                   command=commands.LaunchManagerCommand(
+                                       app=self.cmd_manager,
+                                       cls_or_obj=PlayerManager,
+                                       method=PlayerManager.edit_player)))
+        self.add_option(MenuOption(option_text="List all players",
+                                   command=commands.LaunchManagerCommand(
+                                       app=self.cmd_manager,
+                                       cls_or_obj=PlayerManager,
+                                       method=PlayerManager.list_all_players)))
+        self.add_option(MenuOption("Exit", command=commands_abc.ExitCurrentCommand(self.cmd_manager)))
 
-    def _make_menu(self):
-        """Build our menu"""
-        self.menu_mngr = MenuController("Manage Players")
-        self.menu_mngr.add_option(
-            opt_action=self.register_new_player, opt_text="Register a new player"
-        )
-        self.menu_mngr.add_option(opt_action=self.edit_player, opt_text="Edit player")
-        self.menu_mngr.add_option(
-            opt_action=self.list_all_players, opt_text="List All Players"
-        )
-        self.menu_mngr.add_option(opt_action=None, opt_text="Exit")
+
+class PlayerManager(BaseController):
+    def __init__(self, player_repo: PlayerRepository, app: MainController):
+        super().__init__()
+        self.main_app: MainController = app
+        self.player_repo: PlayerRepository = player_repo
+
+    def default(self):
+        """Launches the player manager: display the menu.
+        """
+        menu_command = commands.DisplayMenuCommand(cls_or_obj=self, cycle=True)
+        self.main_app.receive(menu_command)
 
     def menu(self):
-        """User selects next action"""
-        self.menu_mngr.menu_loop()
+        menu = PlayerManagerMenu(cmdManager=self.main_app)
+        self.main_app.view(menu)
 
     def register_new_player(self):
         """Register a new player in the database."""
@@ -144,8 +164,8 @@ class PlayerManager(BaseController):
             return
         # alphabetic order:
         player_list.sort(key=lambda x: (x.surname.lower() + x.name.lower()))
-        view = PlayerView()
-        view.print_player_list(players=player_list)
+        view = PlayerListView(player_list)
+        self.main_app.view(view)
 
 
 if __name__ == "__main__":

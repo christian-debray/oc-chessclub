@@ -1,5 +1,18 @@
-from app.commands.commands_abc import CommandInterface, GenericHandlerCommand
+from app.commands.commands_abc import CommandInterface, GenericHandlerCommand, CommandManagerInterface
 from typing import Callable
+
+
+class LaunchManagerCommand(GenericHandlerCommand):
+    """Launches a controller or manager"""
+    def __init__(self, app: CommandManagerInterface,
+                 cls_or_obj,
+                 method=None,
+                 **kwargs) -> None:
+        super().__init__(cls_or_obj, method, **kwargs)
+        self.app = app
+
+    def execute(self):
+        self.app.launch(self.cls_or_obj, self.method, **self.params)
 
 
 class DisplayMenuCommand(GenericHandlerCommand):

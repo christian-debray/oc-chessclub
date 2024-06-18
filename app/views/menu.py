@@ -1,4 +1,4 @@
-from app.helpers.text_ui import prompt_v, clear
+from app.helpers.text_ui import prompt_v
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
 from app.views.views_abc import AbstractView
 
@@ -31,7 +31,6 @@ class Menu(AbstractView):
     def choose(self) -> int:
         """Display the menu and prompts for a choice.
         Returns the index of the option selected by the user."""
-        clear()
         if self.title:
             title_str = " ".join([w.capitalize() for w in self.title.split()])
             print(title_str)

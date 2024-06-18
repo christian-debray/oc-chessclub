@@ -1,21 +1,59 @@
+import logging
 import app
+import types
+from dataclasses import dataclass, field
+from time import sleep
+from pathlib import Path
 from app.commands.commands_abc import (
-    CommandManagerInterface,
     CommandInterface,
     StopCommand,
     ExitCurrentCommand,
 )
+from app.controllers.controller_abc import MainController
 from app.commands import commands
-from time import sleep
 from app.views.views_abc import AbstractView
 from app.views.menu import MenuOption, Menu
-from pathlib import Path
-import logging
+from app.models.player_model import PlayerRepository
+from app.controllers.player_manager import PlayerManager
 
 logger = logging.getLogger()
 
 
-class MainController(CommandManagerInterface):
+@dataclass
+class AppConfig:
+    player_repository_file: Path = field(default=Path(app.DATADIR, "players.json"))
+
+
+class AssetLoader:
+    """Helper class used to instanciate controllers and repositories.
+    """
+    def __init__(self, cfg: AppConfig, app: MainController):
+        self._cfg = cfg
+        self.player_repo = None
+        self.tournament_repo = None
+        self.app: MainController = app
+
+    def load(self, cls):
+        """Loads an instance of a suppported controller or repository,
+        applying the app config.
+        """
+        match cls.__name__:
+            case PlayerManager.__name__:
+                return self.load_player_manager()
+            case PlayerRepository.__name__:
+                return self.load_player_repository()
+
+    def load_player_repository(self) -> PlayerRepository:
+        if not self.player_repo:
+            self.player_repo = PlayerRepository(self._cfg.player_repository_file)
+        return self.player_repo
+
+    def load_player_manager(self) -> PlayerManager:
+        return PlayerManager(player_repo=self.load_player_repository(),
+                             app=self.app)
+
+
+class MainController(MainController):
     """Main App controller.
 
     Pilots the app execution from an infinite loop in the main() method.
@@ -26,11 +64,12 @@ class MainController(CommandManagerInterface):
     Views issue commands, collected by the receive() method and placed in the queue.
 
     """
-
     def __init__(self):
         self._command_queue: list[CommandInterface] = []
         self._received_stop_command = False
         self._views: list[AbstractView] = []
+        self._config: AppConfig = AppConfig()
+        self._loader: AssetLoader = AssetLoader(cfg=self._config, app=self)
 
     def receive(self, command: CommandInterface):
         """Receive a command and add it to the command stack.
@@ -73,15 +112,14 @@ class MainController(CommandManagerInterface):
         logger.debug("Preparing the main menu.")
         menu_view = Menu("Chess Club Main Menu", cmdManager=self)
         menu_view.add_option(MenuOption(option_text="First option - does nothing"))
-        menu_view.add_option(MenuOption(option_text="Scond option - does nothing"))
-        menu_view.add_option(
-            MenuOption(option_text="Normal Exit", command=ExitCurrentCommand(mngr=self))
-        )
         menu_view.add_option(
             MenuOption(
-                option_text="Exit All, immediately", command=StopCommand(mngr=self)
-            )
-        )
+                option_text="Manage Players",
+                command=commands.LaunchManagerCommand(
+                    app=self,
+                    cls_or_obj=PlayerManager)
+                ))
+        menu_view.add_option(MenuOption("Exit", command=ExitCurrentCommand(self)))
         self.view(menu_view)
 
     def exit_all(self):
@@ -106,6 +144,23 @@ class MainController(CommandManagerInterface):
             cls_or_obj=self, menu_method="main_menu", cycle=True
         )
         self.receive(mainMenuCommand)
+
+    def launch(self, cls, method="default", **kwargs):
+        """Launches a manager / controller.
+
+        Method can be either the name (str) of a method,
+        or a function object referencing the method to be called.
+        In all cases, the methdo will be called in the context
+        of an instance of the cls object.
+        """
+        obj = self._loader.load(cls)
+        if not obj:
+            raise ValueError(f"Failed to load class {str(cls)}")
+        method_n = method
+        if isinstance(method, types.FunctionType):
+            method_n = method.__name__
+        handler = getattr(obj, method_n or "default")
+        handler(**kwargs)
 
     def main(self):
         """Runs the application main loop."""

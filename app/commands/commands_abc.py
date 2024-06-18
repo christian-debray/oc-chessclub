@@ -41,6 +41,11 @@ class CommandManagerInterface:
         """
         pass
 
+    def launch(self, cls_or_obj, method, **kwargs):
+        """Launches a new process or controller
+        """
+        pass
+
 
 class CommandIssuer:
     """Generic implementation of a class issuing commands.

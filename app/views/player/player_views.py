@@ -1,7 +1,6 @@
-from app.models.player_model import is_valid_national_player_id
-from app.commands import player_commands, commands
-from app.models.player_model import Player
-from app.helpers.text_ui import prompt_v, confirm, clear
+from app.models.player_model import is_valid_national_player_id, Player
+from app.commands import commands, player_commands
+from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key
 from app.helpers.string_formatters import format_cols
 import app.helpers.validation as validation
 from datetime import date
@@ -38,6 +37,7 @@ class PlayerListView:
     def render(self):
         print("*** Players List ***")
         print(self.player_list_str(self.player_list))
+        proceed_any_key()
 
     @staticmethod
     def player_list_str(players: list[Player]) -> str:
