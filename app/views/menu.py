@@ -1,5 +1,6 @@
 from app.helpers.text_ui import prompt_v, clear
 
+
 class Menu:
     def __init__(self, title: str = None, options: list[str] = None):
         self.options: list[str] = options or []
@@ -20,20 +21,21 @@ class Menu:
         opt_lines = []
         for o in range(len(self.options)):
             opt = self.options[o]
-            opt_key = f'{o + 1}'
-            opt_marker = f'{opt_key}. '
-            opt_indent = " "*self.indent
+            opt_key = f"{o + 1}"
+            opt_marker = f"{opt_key}. "
+            opt_indent = " " * self.indent
             opt_lines.append(f"{opt_indent}{opt_marker}{opt}")
             opt_keys[opt_key] = o
             lw = len(opt_lines[-1])
             width = lw if lw > width else width
-        
+
         print(self.ruler * width)
         print("\n".join(opt_lines))
         print(self.ruler * width)
 
-        choice = prompt_v(prompt= "Enter option number: ",
-                          validator= lambda x: x in opt_keys)
+        choice = prompt_v(
+            prompt="Enter option number: ", validator=lambda x: x in opt_keys
+        )
         if choice is not None and choice in opt_keys:
             return opt_keys[choice]
         else:
