@@ -1,6 +1,5 @@
 from app.models.player_model import PlayerRepository, Player
-from app.views.player_editor import PlayerEditor
-from app.views.player_view import PlayerView
+from app.views.player.player_views import PlayerEditor, PlayerView
 from app.controllers.controller_abc import BaseController, MenuController
 import logging
 
