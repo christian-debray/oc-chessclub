@@ -1,5 +1,7 @@
 """ANSI colors and formats
 """
+
+
 class Formatter:
     BLACK = "\033[0;30m"
     RED = "\033[0;31m"
@@ -33,4 +35,3 @@ class Formatter:
         format_name = format.upper()
         f = getattr(cls, format_name) if hasattr(cls, format_name) else format
         return rf"{f}{txt}{cls.END}"
-    

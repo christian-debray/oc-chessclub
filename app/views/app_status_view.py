@@ -1,5 +1,6 @@
 from app.helpers.ansi import Formatter
 
+
 class AppStatusView:
 
     def display_status_message(self, msg: str):
@@ -9,10 +10,10 @@ class AppStatusView:
         print(msg)
 
     def notify_warning(self, msg: str):
-        self.notify(Formatter.format(msg, 'yellow'))
+        self.notify(Formatter.format(msg, "yellow"))
 
     def notify_success(self, msg: str):
-        self.notify(Formatter.format(msg, 'light_green'))
-    
+        self.notify(Formatter.format(msg, "light_green"))
+
     def notify_failure(self, msg: str):
-        self.notify(Formatter.format(msg, 'light_red'))
+        self.notify(Formatter.format(msg, "light_red"))

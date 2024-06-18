@@ -1,4 +1,13 @@
 ansio==0.0.1
 evdev==1.7.1
+flake8==7.1.0
+flake8-html==0.4.3
+Jinja2==3.1.4
+MarkupSafe==2.1.5
+mccabe==0.7.0
+pycodestyle==2.12.0
+pyflakes==3.2.0
+Pygments==2.18.0
+pynput==1.7.7
 python-xlib==0.33
 six==1.16.0
