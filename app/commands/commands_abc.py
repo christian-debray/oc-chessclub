@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import Callable
 
 
 class CommandInterface:
@@ -15,10 +14,16 @@ class CommandInterface:
     """
     def __init__(self, cycle: bool | int = False) -> None:
         self.cycle = cycle
+        self.params = None
 
     @abstractmethod
     def execute(self):
         pass
+
+    def set_command_params(self, *args, **kwargs):
+        """Clients may set parameters before issuing a command.
+        """
+        self.params = kwargs or {}
 
 
 class CommandManagerInterface:
@@ -60,48 +65,3 @@ class CommandIssuer:
         """
         if self.cmd_manager and cmd:
             self.cmd_manager.receive(cmd)
-
-
-class StopCommand(CommandInterface):
-    """Require the app to stop without delay.
-    """
-    def __init__(self, mngr: CommandManagerInterface) -> None:
-        super().__init__()
-        self.mngr: CommandManagerInterface = mngr
-
-    def execute(self):
-        self.mngr.exit_all()
-
-
-class ExitCurrentCommand(CommandInterface):
-    """Require the app to exit current context.
-
-    Useful to exit a cycling menu, for instance.
-    """
-    def __init__(self, mngr: CommandManagerInterface) -> None:
-        super().__init__()
-        self.mngr: CommandManagerInterface = mngr
-
-    def execute(self):
-        self.mngr.exit_current()
-
-
-class GenericHandlerCommand(CommandInterface):
-    def __init__(self, cls_or_obj=None, method=None, **kwargs) -> None:
-        super().__init__()
-        self.cls_or_obj = cls_or_obj
-        self.method = method
-        self.params = kwargs or {}
-
-    def execute(self):
-        handler = None
-        if self.cls_or_obj:
-            if hasattr(self.cls_or_obj, self.method):
-                handler = getattr(self.cls_or_obj, self.method)
-            elif callable(self.cls_or_obj):
-                handler = self.cls_or_obj
-        elif self.method and Callable(self.method):
-            handler = self.method
-        if not handler:
-            return
-        handler(**self.params)

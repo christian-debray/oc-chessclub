@@ -24,11 +24,11 @@ def is_valid_national_player_id(val: str):
 
 
 class NationalPlayerID(Hashable):
-    """Subset of the str type specific to national player ID format
-    """
+    """Subset of the str type specific to national player ID format"""
+
     def __init__(self, string):
         if not is_valid_national_player_id(string):
-            raise ValueError('Invalid player ID')
+            raise ValueError("Invalid player ID")
         self._val: str = string
 
     def __str__(self):
@@ -63,60 +63,74 @@ class Player(EntityABC):
         self.national_player_id = NationalPlayerID(str(id))
 
     def is_valid(self) -> bool:
-        """return True if all data stored by this object is valid.
-        """
-        return is_valid_national_player_id(str(self.id())) and\
-            isinstance(self.birthdate, date) and\
-            validation.is_valid_name(self.surname) and\
-            validation.is_valid_name(self.name)
+        """return True if all data stored by this object is valid."""
+        return (
+            is_valid_national_player_id(str(self.id()))
+            and isinstance(self.birthdate, date)
+            and validation.is_valid_name(self.surname)
+            and validation.is_valid_name(self.name)
+        )
 
     @classmethod
-    def copy(cls, other_player: 'Player'):
-        """Copies all data from one player ot a new Player object.
-        """
-        return cls(national_player_id=NationalPlayerID(str(other_player.id())) if other_player.id() else None,
-                   surname=other_player.surname,
-                   name=other_player.name,
-                   birthdate=other_player.birthdate)
+    def copy(cls, other_player: "Player"):
+        """Copies all data from one player ot a new Player object."""
+        return cls(
+            national_player_id=(
+                NationalPlayerID(str(other_player.id())) if other_player.id() else None
+            ),
+            surname=other_player.surname,
+            name=other_player.name,
+            birthdate=other_player.birthdate,
+        )
+
+    def asdict(self) -> dict:
+        return {
+            "national_player_id": str(self.id()) if self.national_player_id else None,
+            "surname": self.surname,
+            "name": self.name,
+            "birthdate": self.birthdate,
+        }
 
 
 class PlayerJSONEncoder(json.JSONEncoder):
-    """Encode Player object to JSON
-    """
+    """Encode Player object to JSON"""
+
     def default(self, o: Player):
         if isinstance(o, Player):
             return {
-                'national_player_id': str(o.national_player_id),
-                'surname': o.surname,
-                'name': o.name,
-                'birthdate': o.birthdate.isoformat()
+                "national_player_id": str(o.national_player_id),
+                "surname": o.surname,
+                "name": o.name,
+                "birthdate": o.birthdate.isoformat(),
             }
         else:
             return super().default(o)
 
 
 class PlayerJSONDecoder(json.JSONDecoder):
-    """Decode Player object from JSON
-    """
+    """Decode Player object from JSON"""
+
     def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(self, object_hook=self.obj_hook, *args, **kwargs)
 
     def obj_hook(self, dct):
-        if 'national_player_id' not in dct:
+        if "national_player_id" not in dct:
             return dct
         return Player(
-            national_player_id=dct['national_player_id'],
-            surname=dct['surname'],
-            name=dct['name'],
-            birthdate=date.fromisoformat(dct['birthdate'])
+            national_player_id=dct["national_player_id"],
+            surname=dct["surname"],
+            name=dct["name"],
+            birthdate=date.fromisoformat(dct["birthdate"]),
         )
 
 
 class PlayerRepository(JSONRepository[Player]):
-    """Store player data to a JSON file.
-    """
+    """Store player data to a JSON file."""
+
     def __init__(self, filename):
-        super().__init__(file=filename, encoder=PlayerJSONEncoder, decoder=PlayerJSONDecoder)
+        super().__init__(
+            file=filename, encoder=PlayerJSONEncoder, decoder=PlayerJSONDecoder
+        )
 
     def find_by_id(self, id: NationalPlayerID | str) -> Player:
         """Finds a player by his National Player ID.

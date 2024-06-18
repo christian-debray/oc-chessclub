@@ -1,8 +1,8 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from app.commands.commands_abc import CommandIssuer, CommandManagerInterface
 
 
-class AbstractView(ABC, CommandIssuer):
+class AbstractView(CommandIssuer):
     """Base class for all views.
 
     Views a responsible for rendering the UI.

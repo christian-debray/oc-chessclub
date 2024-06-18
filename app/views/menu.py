@@ -23,7 +23,8 @@ class Menu(AbstractView):
 
     def render(self):
         choice = self.choose()
-        self.issuecmd(self.options[choice].command)
+        if choice is not None:
+            self.issuecmd(self.options[choice].command)
 
     def add_option(self, option: MenuOption):
         self.options.append(option)
@@ -31,6 +32,7 @@ class Menu(AbstractView):
     def choose(self) -> int:
         """Display the menu and prompts for a choice.
         Returns the index of the option selected by the user."""
+        print("\n\n")
         if self.title:
             title_str = " ".join([w.capitalize() for w in self.title.split()])
             print(title_str)

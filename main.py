@@ -4,12 +4,9 @@ import types
 from dataclasses import dataclass, field
 from time import sleep
 from pathlib import Path
-from app.commands.commands_abc import (
-    CommandInterface,
-    StopCommand,
-    ExitCurrentCommand,
-)
+from app.commands.commands_abc import CommandInterface
 from app.controllers.controller_abc import MainController
+from app.commands.commands import StopCommand, ExitCurrentCommand
 from app.commands import commands
 from app.views.views_abc import AbstractView
 from app.views.menu import MenuOption, Menu
@@ -51,6 +48,17 @@ class AssetLoader:
     def load_player_manager(self) -> PlayerManager:
         return PlayerManager(player_repo=self.load_player_repository(),
                              app=self.app)
+
+
+class MainMenuCommand(CommandInterface):
+    def __init__(self,
+                 app: MainController,
+                 cycle: bool | int = False) -> None:
+        super().__init__(cycle)
+        self.app = app
+
+    def execute(self):
+        self.app.main_menu()
 
 
 class MainController(MainController):
@@ -138,14 +146,7 @@ class MainController(MainController):
         if len(self._command_queue) > 0:
             self._command_queue.pop()
 
-    def issue_main_menu_command(self):
-        """Issue the main menu command to ourselve."""
-        mainMenuCommand = commands.DisplayMenuCommand(
-            cls_or_obj=self, menu_method="main_menu", cycle=True
-        )
-        self.receive(mainMenuCommand)
-
-    def launch(self, cls, method="default", **kwargs):
+    def launch(self, cls_or_obj, method="default", **kwargs):
         """Launches a manager / controller.
 
         Method can be either the name (str) of a method,
@@ -153,19 +154,22 @@ class MainController(MainController):
         In all cases, the methdo will be called in the context
         of an instance of the cls object.
         """
-        obj = self._loader.load(cls)
+        obj = self._loader.load(cls_or_obj)
         if not obj:
-            raise ValueError(f"Failed to load class {str(cls)}")
+            raise ValueError(f"Failed to load class {str(cls_or_obj)}")
         method_n = method
         if isinstance(method, types.FunctionType):
             method_n = method.__name__
         handler = getattr(obj, method_n or "default")
+        logger.debug(f"Launching: {obj.__class__.__name__}.{method_n} ({kwargs})")
         handler(**kwargs)
 
     def main(self):
         """Runs the application main loop."""
         logger.debug("Start application main loop")
-        self.issue_main_menu_command()
+
+        # always display the main menu when we hit the bottom of the command stack
+        self.receive(MainMenuCommand(app=self, cycle=True))
 
         while len(self._command_queue) > 0 and self._received_stop_command is False:
             if len(self._command_queue) > 0:
