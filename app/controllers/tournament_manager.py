@@ -1,7 +1,11 @@
 from datetime import date
 from app.commands import commands
 from app.controllers.controller_abc import BaseController, MainController
-from app.models.tournament_model import TournamentRepository, TournamentMetaData
+from app.models.tournament_model import (
+    TournamentRepository,
+    TournamentMetaData,
+    Tournament,
+)
 from app.views.views_abc import SimpleView
 from app.views.menu import Menu, MenuOption
 from app.views.tournament import tournament_views
@@ -52,15 +56,23 @@ class EditTournamentInfoCommand(commands.LaunchManagerCommand):
         )
 
 
+class StoreNewTournamentCommand(commands.LaunchManagerCommand):
+    def __init__(self, app: commands.CommandInterface, form_data: dict = None):
+        super().__init__(
+            app=app,
+            cls_or_obj=TournamentManager,
+            method=TournamentManager.store_new_tournament,
+            **form_data,
+        )
+
+
 class UpdateTournamentMetaCommand(commands.LaunchManagerCommand):
-    def __init__(
-            self, app: commands.CommandInterface,
-            form_data: dict = None):
+    def __init__(self, app: commands.CommandInterface, form_data: dict = None):
         super().__init__(
             app=app,
             cls_or_obj=TournamentManager,
             method=TournamentManager.update_tournament_meta,
-            **form_data
+            **form_data,
         )
 
 
@@ -162,11 +174,6 @@ class TournamentManager(BaseController):
         )
         self.main_app.view(menu)
 
-    def new_tournament(self):
-        """Creates a new tournament."""
-        v = SimpleView(cmd_manager=self.main_app, title="Create a new Tournament")
-        self.main_app.view(v)
-
     def load_tournament(self, tournament_id: str = None):
         """Load a tournament in memory and sets as current tournament
         for other operations.
@@ -224,8 +231,9 @@ Please check the tournament ID and files in the tournament data folder."
             data=tournament_metadata.asdict(),
             frozen_fields=frozen_fields,
             text=f"Edit tournament {self._tournament_meta_str(tournament_metadata)}",
-            confirm_command=UpdateTournamentMetaCommand(app=self.main_app,
-                                                        form_data=tournament_metadata.asdict())
+            confirm_command=UpdateTournamentMetaCommand(
+                app=self.main_app, form_data=tournament_metadata.asdict()
+            ),
         )
         self.main_app.view(v)
 
@@ -255,8 +263,9 @@ Please check the tournament ID and files in the tournament data folder."
         try:
             # start_date, "location", "turn_count", "description"
             if "start_date" not in frozen_fields:
-                u_start_date = date.fromisoformat(kwargs.get("start_date"))
-                tournament.set_start_date(u_start_date)
+                if d_str := kwargs.get("start_date"):
+                    u_start_date = date.fromisoformat(d_str)
+                    tournament.set_start_date(u_start_date)
             if "location" not in frozen_fields:
                 u_location = kwargs.get("location")
                 tournament.set_location(u_location)
@@ -269,6 +278,56 @@ Please check the tournament ID and files in the tournament data folder."
             if self.tournament_repo.store_tournament(tournament):
                 t_str = self._tournament_meta_str(tournament.metadata)
                 self.status.notify_success(f"Updated tournament: {t_str}")
+        except ValueError:
+            self.status.notify_failure("Failed to store changes: invalid data.")
+            return
+        except Exception as e:
+            logger.error(e)
+            self.status.notify_failure("Failed to store changes: unexpected error.")
+
+    def new_tournament(self):
+        """Creates a new tournament."""
+        v = SimpleView(cmd_manager=self.main_app, title="Create a new Tournament")
+        frozen_fields = []
+        v = tournament_views.TournamentMetaEditor(
+            cmd_manager=self.main_app,
+            title="Create a new Tournament",
+            data=TournamentMetaData().asdict(),
+            frozen_fields=frozen_fields,
+            confirm_command=StoreNewTournamentCommand(
+                app=self.main_app, form_data=TournamentMetaData().asdict()
+            ),
+        )
+        self.main_app.view(v)
+
+    def store_new_tournament(self, **kwargs):
+        """Fills a new tournament instance with form data passed in the parameters,
+        and stores in the repository.
+        If successfull, the new tournament becomes the active tournament.
+        """
+        if len(kwargs) == 0:
+            self.status.notify_failure("Can't update: form data is empty.")
+
+        try:
+            # start_date, "location", "turn_count", "description"
+            if d_str := kwargs.get("start_date"):
+                u_start_date = date.fromisoformat(d_str)
+            else:
+                u_start_date = None
+            u_location = kwargs.get("location") or None
+            u_turn_count = int(kwargs.get("turn_count")) or None
+            u_description = kwargs.get("description") or None
+            tournament_meta = TournamentMetaData(
+                start_date=u_start_date,
+                location=u_location,
+                description=u_description,
+                turn_count=u_turn_count
+            )
+            tournament = Tournament(metadata=tournament_meta)
+            if self.tournament_repo.store_tournament(tournament):
+                t_str = self._tournament_meta_str(tournament.metadata)
+                self.status.notify_success(f"New tournament created: {t_str}")
+                self.main_app.set_state("current_tournament_id", tournament.id())
         except ValueError:
             self.status.notify_failure("Failed to store changes: invalid data.")
             return
