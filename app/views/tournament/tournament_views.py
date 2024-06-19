@@ -101,8 +101,8 @@ class SelectTournamentIDView(AbstractView):
 
 
 class TournamentMetaEditor(BaseView):
-    """Display a form to edit the metadata of a tournament"""
-
+    """Display a form to edit the metadata of a tournament.
+    """
     def __init__(
         self,
         cmd_manager: commands_abc.CommandManagerInterface,
@@ -128,7 +128,7 @@ class TournamentMetaEditor(BaseView):
         super().render()
         if user_data := self.display_form(self.data, self.frozen_fields):
             if self.confirm_command:
-                self.confirm_command.set_command_params(user_data)
+                self.confirm_command.set_command_params(**user_data)
                 self.issuecmd(self.confirm_command)
         elif self.cancel_command:
             self.issuecmd(self.cancel_command)
