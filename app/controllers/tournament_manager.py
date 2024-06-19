@@ -1,6 +1,6 @@
 from app.commands import commands
 from app.controllers.controller_abc import BaseController, MainController
-from app.models.tournament_model import TournamentRepository
+from app.models.tournament_model import TournamentRepository, TournamentMetaData
 from app.views.views_abc import SimpleView
 from app.views.menu import Menu, MenuOption
 from app.views.tournament import tournament_views
@@ -66,9 +66,24 @@ class TournamentManager(BaseController):
         )
         self.main_app.receive(menu_command)
 
+    def _curr_tournament_id(self) -> str:
+        return self.main_app.get_state("current_tournament_id")
+
+    def _curr_tournament_meta(self) -> TournamentMetaData:
+        if curr_id := self._curr_tournament_id():
+            return self.tournament_repo.find_tournament_metadata_by_id(curr_id)
+        return None
+
     def menu(self):
         """Load the Tournament manager menu"""
-        menu = Menu("Tournament Manager - Menu", cmdManager=self.main_app)
+        current_tournament_str = None
+        if curr_tournament_meta := self._curr_tournament_meta():
+            current_tournament_str = f"Current tournament: {self._tournament_meta_str(curr_tournament_meta)}"
+
+        menu = Menu(title="Tournament Manager - Menu",
+                    cmdManager=self.main_app,
+                    text=current_tournament_str
+                    )
         menu.add_option(
             MenuOption(
                 option_text="New Tournament",
@@ -125,19 +140,15 @@ class TournamentManager(BaseController):
         else:
             reason = ""
             try:
-                tournament_data = self.tournament_repo.find_tournament_by_id(
+                tournament = self.tournament_repo.find_tournament_by_id(
                     tournament_id=tournament_id
                 )
-                if not tournament_data:
+                if not tournament:
                     reason = "Tournament ID not found"
                     raise KeyError(reason)
                 self.main_app.set_state('current_tournament_id', tournament_id)
-                tournament_meta = (
-                    tournament_views.TournamentMetaView.tournament_meta_template(
-                        tournament_data.metadata.asdict()
-                    )
-                )
-                self.status.notify_success(f"Tournament loaded: {tournament_meta}")
+                tournament_meta_str = self._tournament_meta_str(tournament.metadata)
+                self.status.notify_success(f"Tournament loaded: {tournament_meta_str}")
             except Exception as e:
                 logger.error(e)
                 self.status.notify_failure(
@@ -145,6 +156,11 @@ class TournamentManager(BaseController):
 Please check the tournament ID and files in the tournament data folder."
                 )
                 return
+
+    def _tournament_meta_str(self, meta: TournamentMetaData) -> str:
+        """Return a simple string view of a tournament metadata
+        """
+        return tournament_views.TournamentMetaView.tournament_meta_template(meta.asdict())
 
     def list_tournaments(self):
         """Display a list of all tournaments."""

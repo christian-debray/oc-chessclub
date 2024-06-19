@@ -4,7 +4,7 @@ from app.commands.commands_abc import (
     CommandManagerInterface,
     CommandInterface,
 )
-from app.helpers.text_ui import clear
+from app.helpers import text_ui
 
 
 class AbstractView(CommandIssuer):
@@ -41,9 +41,12 @@ class BaseView(AbstractView):
         self.text: str = text
         self.clear_when_render: bool = clear_scr
 
+    def clear_scr(self):
+        text_ui.clear()
+
     def render(self):
         if self.clear_when_render:
-            clear()
+            self.clear_scr()
         else:
             print("\n")
         if self.title:
@@ -74,7 +77,7 @@ class SimpleView(BaseView):
 
     def render(self):
         if self.clear_when_render:
-            clear()
+            self.clear_scr()
         else:
             print("\n")
         if self.title:

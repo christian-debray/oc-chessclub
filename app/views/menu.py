@@ -1,6 +1,6 @@
 from app.helpers.text_ui import prompt_v
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
-from app.views.views_abc import AbstractView
+from app.views.views_abc import BaseView
 
 
 class MenuOption:
@@ -15,29 +15,42 @@ class MenuOption:
     Note: option keys and alt_keys are case insensitive, ie 'x' and 'X'
     are the same.
     """
-    def __init__(self, option_text: str,
-                 option_value=None,
-                 command: CommandInterface = None,
-                 alt_key: str = None):
+
+    def __init__(
+        self,
+        option_text: str,
+        option_value=None,
+        command: CommandInterface = None,
+        alt_key: str = None,
+    ):
         self.text = option_text
         self.value = option_value
         self.command = command
         self.alt_key: str = alt_key.upper() if alt_key is not None else None
 
 
-class Menu(AbstractView):
-    """Displays a menu and prompts the user to choose an option.
-    """
-    def __init__(self, title: str = None, options: list[MenuOption] = None,
-                 cmdManager: CommandManagerInterface = None):
-        super().__init__(cmd_manager=cmdManager)
+class Menu(BaseView):
+    """Displays a menu and prompts the user to choose an option."""
+
+    def __init__(
+        self,
+        title: str = None,
+        text: str = None,
+        options: list[MenuOption] = None,
+        cmdManager: CommandManagerInterface = None,
+        clear_scr: bool = False,
+    ):
+        super().__init__(
+            cmd_manager=cmdManager, title=title, text=text, clear_scr=clear_scr
+        )
         self.options: list[MenuOption] = options or []
-        self.title: str = title
         self.ruler = "="
         self.indent = 1
 
     def render(self):
-        choice = self.choose()
+        if self.clear_when_render:
+            self.clear_scr()
+        choice: int = self.choose()
         if choice is not None:
             self.issuecmd(self.options[choice].command)
 
@@ -47,6 +60,7 @@ class Menu(AbstractView):
     def choose(self) -> int:
         """Display the menu and prompts for a choice.
         Returns the index of the option selected by the user."""
+
         print("\n\n")
         if self.title:
             title_str = " ".join([w.capitalize() for w in self.title.split()])
@@ -72,6 +86,8 @@ class Menu(AbstractView):
         print("\n".join(opt_lines))
         print(self.ruler * width)
 
+        if self.text:
+            print(self.text, "\n")
         choice = prompt_v(
             prompt="Enter option number: ", validator=lambda x: x in opt_keys
         )
