@@ -3,6 +3,7 @@ from app.controllers.controller_abc import BaseController, MainController
 from app.models.tournament_model import TournamentRepository
 from app.views.views_abc import SimpleView
 from app.views.menu import Menu, MenuOption
+from app.views.tournament import tournament_views
 import logging
 
 logger = logging.getLogger()
@@ -132,8 +133,11 @@ class TournamentManager(BaseController):
 
     def list_tournaments(self):
         """Display a list of all tournaments."""
-        v = SimpleView(cmd_manager=self.main_app,
-                       title="List all tournaments")
+        tournaments = self.tournament_repo.list_tournament_meta()
+        data = [m.asdict() for m in tournaments]
+        v = tournament_views.TournamentsListView(cmd_manager=self.main_app,
+                                                 title="All Tournaments",
+                                                 tournament_list=data)
         self.main_app.view(v)
 
     def edit_tournament_info(self, tournament_id: str):

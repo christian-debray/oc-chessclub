@@ -23,7 +23,36 @@ class AbstractView(CommandIssuer):
         pass
 
 
-class SimpleView(AbstractView):
+class BaseView(AbstractView):
+    """A simple view that displays a title and some text.
+
+    Use this as a template or base class when creating new views.
+    """
+
+    def __init__(
+        self,
+        cmd_manager: CommandManagerInterface,
+        title: str,
+        text: str = None,
+        clear_scr: bool = False,
+    ):
+        super().__init__(cmd_manager)
+        self.title: str = title
+        self.text: str = text
+        self.clear_when_render: bool = clear_scr
+
+    def render(self):
+        if self.clear_when_render:
+            clear()
+        else:
+            print("\n")
+        if self.title:
+            print(f"*** {self.title.upper()} ***\n")
+        if self.text:
+            print(self.text)
+
+
+class SimpleView(BaseView):
     """A simple view that displays a title and some text.
 
     Optionnally issues a command when done with rendering.
@@ -38,10 +67,9 @@ class SimpleView(AbstractView):
         clear_scr: bool = False,
         command: CommandInterface = None,
     ):
-        super().__init__(cmd_manager)
-        self.title: str = title
-        self.text: str = text
-        self.clear_when_render: bool = clear_scr
+        super().__init__(
+            cmd_manager=cmd_manager, title=title, text=text, clear_scr=clear_scr
+        )
         self.command = command
 
     def render(self):
