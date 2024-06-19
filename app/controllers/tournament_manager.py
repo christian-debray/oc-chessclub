@@ -99,6 +99,7 @@ class TournamentManager(BaseController):
         menu.add_option(
             MenuOption(
                 option_text="Return to main menu",
+                alt_key='X',
                 command=commands.ExitCurrentCommand(self.main_app),
             )
         )

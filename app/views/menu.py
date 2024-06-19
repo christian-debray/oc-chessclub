@@ -4,15 +4,30 @@ from app.views.views_abc import AbstractView
 
 
 class MenuOption:
+    """A Menu Item.
+
+    - option_text: label displayed for this option in the menu.
+    - option_value: optional value of this item.
+    - command: command to execute when this option is selected
+    - alt_key: optional key to select this option. This will set
+            a "permanent" key to select this item from the parent menu.
+
+    Note: option keys and alt_keys are case insensitive, ie 'x' and 'X'
+    are the same.
+    """
     def __init__(self, option_text: str,
                  option_value=None,
-                 command: CommandInterface = None):
+                 command: CommandInterface = None,
+                 alt_key: str = None):
         self.text = option_text
         self.value = option_value
         self.command = command
+        self.alt_key: str = alt_key.upper() if alt_key is not None else None
 
 
 class Menu(AbstractView):
+    """Displays a menu and prompts the user to choose an option.
+    """
     def __init__(self, title: str = None, options: list[MenuOption] = None,
                  cmdManager: CommandManagerInterface = None):
         super().__init__(cmd_manager=cmdManager)
@@ -42,11 +57,14 @@ class Menu(AbstractView):
         opt_lines = []
         for o in range(len(self.options)):
             opt = self.options[o]
-            opt_key = f"{o + 1}"
-            opt_marker = f"{opt_key}. "
+            opt_key = f"{o + 1}" if opt.alt_key is None else f"{opt.alt_key.upper()}"
+            opt_marker = f"({opt_key}) "
             opt_indent = " " * self.indent
             opt_lines.append(f"{opt_indent}{opt_marker}{opt.text}")
             opt_keys[opt_key] = o
+            if opt.alt_key is not None:
+                opt_keys[opt.alt_key.upper()] = o
+                opt_keys[opt.alt_key.lower()] = o
             lw = len(opt_lines[-1])
             width = lw if lw > width else width
 

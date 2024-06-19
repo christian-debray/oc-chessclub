@@ -160,7 +160,9 @@ class MainController(MainController):
                 )
             )
         )
-        menu_view.add_option(MenuOption("Exit", command=ExitCurrentCommand(self)))
+        menu_view.add_option(MenuOption(option_text="Exit",
+                                        alt_key="X",
+                                        command=ExitCurrentCommand(self)))
         self.view(menu_view)
 
     def exit_all(self):
