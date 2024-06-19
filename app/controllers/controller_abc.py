@@ -1,41 +1,39 @@
+from abc import abstractmethod
+from app.commands.commands_abc import CommandManagerInterface
+from app.views.views_abc import AbstractView
 from app.views.app_status_view import AppStatusView
-from typing import Callable
-from app.views.menu import Menu
+from typing import Any
+
+
+class MainController(CommandManagerInterface):
+
+    @abstractmethod
+    def view(self, view: AbstractView):
+        """Register a view"""
+        pass
+
+    @abstractmethod
+    def set_state(self, key: str, value):
+        """Records a value in the application's current state.
+        """
+        pass
+
+    @abstractmethod
+    def get_state(self, key: str) -> Any:
+        """Returns the value of an element in the application's current state.
+        """
+
+    @abstractmethod
+    def clear_state(self, key: str):
+        """Removes an element from the application's current state."""
 
 
 class BaseController:
     def __init__(self):
         self.status = AppStatusView()
 
-
-class MenuController:
-    """A generic menu controller.
-    Provides a loop to choose
-    """
-
-    def __init__(self, menu_title: str = None):
-        self._options_map = []
-        self._menu = Menu(title=menu_title)
-
-    def set_title(self, title: str):
-        self._menu.title = title
-
-    def add_option(self, opt_action: Callable | None, opt_text: str):
-        self._options_map.append((opt_action, opt_text))
-        self._menu.options.append(opt_text)
-
-    def menu_loop(self):
-        """User selects next action.
-        Loops until user selects an option mapped to None.
+    @abstractmethod
+    def default():
+        """Default method to call when invoking a controller.
         """
-        loop = True
-        while loop:
-            choice = self._menu.choose()
-            if choice is not None:
-                do = self._options_map[choice][0]
-                if do is not None and callable(do):
-                    do()
-                else:
-                    loop = False
-            else:
-                loop = False
+        pass

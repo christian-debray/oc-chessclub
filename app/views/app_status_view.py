@@ -2,7 +2,8 @@ from app.helpers.ansi import Formatter
 
 
 class AppStatusView:
-
+    """A widget that displays status messages.
+    """
     def display_status_message(self, msg: str):
         print(msg)
 

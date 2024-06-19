@@ -42,6 +42,46 @@ def prompt_v(
         return None
 
 
+def form_field(
+    field: str,
+    form_data: dict,
+    label: str = None,
+    validator: str | Callable = None,
+    not_valid_msg: str = None,
+    skip_blank: bool = False,
+    frozen_fields: list[str] = None,
+    display_current: bool = True,
+) -> str:
+    """Template to render either an input or displaying a frozen field.
+
+    form_data holds a view of the data where field can be found.
+
+    If the field name is found in the frozen_fields param, then don't prompt for a value.
+    Display and return the current value found in form_data instead.
+
+    Otherwise, prompt the user for a value for field, using the prompt_v function,
+    and return the user value.
+    When prompting for a new value, the function can also display the current value found
+    in form_data.
+    """
+    frozen_fields = frozen_fields or []
+    label = label or f"{field}"
+    if field in frozen_fields:
+        print(f"{label}: {form_data.get(field)}")
+        return form_data.get(field)
+    else:
+        if display_current:
+            label = f"{label} (current={form_data.get(field)}): "
+        else:
+            label += ": "
+        return prompt_v(
+            prompt=label,
+            validator=validator,
+            not_valid_msg=not_valid_msg,
+            skip_blank=skip_blank,
+        )
+
+
 def clear():
     """Clears the console screen.
 
