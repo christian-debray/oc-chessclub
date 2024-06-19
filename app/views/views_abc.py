@@ -1,5 +1,10 @@
 from abc import abstractmethod
-from app.commands.commands_abc import CommandIssuer, CommandManagerInterface
+from app.commands.commands_abc import (
+    CommandIssuer,
+    CommandManagerInterface,
+    CommandInterface,
+)
+from app.helpers.text_ui import clear
 
 
 class AbstractView(CommandIssuer):
@@ -8,11 +13,46 @@ class AbstractView(CommandIssuer):
     Views a responsible for rendering the UI.
     User input handling is delegated to Command objects.
     """
+
     def __init__(self, cmd_manager: CommandManagerInterface):
         super().__init__(cmd_manager)
 
     @abstractmethod
     def render(self):
-        """Displays the view to the user. Usually called by the main app.
-        """
+        """Displays the view to the user. Usually called by the main app."""
         pass
+
+
+class SimpleView(AbstractView):
+    """A simple view that displays a title and some text.
+
+    Optionnally issues a command when done with rendering.
+    Use this as a template when creating new views.
+    """
+
+    def __init__(
+        self,
+        cmd_manager: CommandManagerInterface,
+        title: str,
+        text: str = None,
+        clear_scr: bool = False,
+        command: CommandInterface = None,
+    ):
+        super().__init__(cmd_manager)
+        self.title: str = title
+        self.text: str = text
+        self.clear_when_render: bool = clear_scr
+        self.command = command
+
+    def render(self):
+        if self.clear_when_render:
+            clear()
+        else:
+            print("\n")
+        if self.title:
+            print(f"*** {self.title.upper()} ***\n")
+        if self.text:
+            print(self.text)
+
+        if self.command:
+            self.issuecmd(self.command)

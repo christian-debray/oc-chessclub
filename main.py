@@ -12,6 +12,8 @@ from app.views.views_abc import AbstractView
 from app.views.menu import MenuOption, Menu
 from app.models.player_model import PlayerRepository
 from app.controllers.player_manager import PlayerManager
+from app.models.tournament_model import TournamentRepository
+from app.controllers.tournament_manager import TournamentManager
 
 logger = logging.getLogger()
 
@@ -19,15 +21,20 @@ logger = logging.getLogger()
 @dataclass
 class AppConfig:
     player_repository_file: Path = field(default=Path(app.DATADIR, "players.json"))
+    tournament_data_dir: Path = field(default=Path(app.DATADIR, "tournaments"))
+    tournament_repository_file: Path = field(
+        default=Path(app.DATADIR, "tournaments", "tournament_index.json")
+    )
 
 
 class AssetLoader:
-    """Helper class used to instanciate controllers and repositories.
-    """
+    """Helper class used to instanciate controllers and repositories."""
+
     def __init__(self, cfg: AppConfig, app: MainController):
         self._cfg = cfg
         self.player_repo = None
         self.tournament_repo = None
+        self.tournament_manager = None
         self.app: MainController = app
 
     def load(self, cls):
@@ -39,6 +46,10 @@ class AssetLoader:
                 return self.load_player_manager()
             case PlayerRepository.__name__:
                 return self.load_player_repository()
+            case TournamentRepository.__name__:
+                return self.load_tournament_repository()
+            case TournamentManager.__name__:
+                return self.load_tournament_manager()
 
     def load_player_repository(self) -> PlayerRepository:
         if not self.player_repo:
@@ -46,14 +57,26 @@ class AssetLoader:
         return self.player_repo
 
     def load_player_manager(self) -> PlayerManager:
-        return PlayerManager(player_repo=self.load_player_repository(),
-                             app=self.app)
+        return PlayerManager(player_repo=self.load_player_repository(), app=self.app)
+
+    def load_tournament_repository(self) -> TournamentRepository:
+        if not self.tournament_repo:
+            self.tournament_repo = TournamentRepository(
+                metadata_file=self._cfg.tournament_repository_file,
+                player_repo=self.load_player_repository()
+            )
+        return self.tournament_repo
+
+    def load_tournament_manager(self) -> TournamentManager:
+        if not self.tournament_manager:
+            self.tournament_manager = TournamentManager(
+                tournament_repo=self.load_tournament_repository(), main_app=self.app
+            )
+        return self.tournament_manager
 
 
 class MainMenuCommand(CommandInterface):
-    def __init__(self,
-                 app: MainController,
-                 cycle: bool | int = False) -> None:
+    def __init__(self, app: MainController, cycle: bool | int = False) -> None:
         super().__init__(cycle)
         self.app = app
 
@@ -72,6 +95,7 @@ class MainController(MainController):
     Views issue commands, collected by the receive() method and placed in the queue.
 
     """
+
     def __init__(self):
         self._command_queue: list[CommandInterface] = []
         self._received_stop_command = False
@@ -124,9 +148,18 @@ class MainController(MainController):
             MenuOption(
                 option_text="Manage Players",
                 command=commands.LaunchManagerCommand(
-                    app=self,
-                    cls_or_obj=PlayerManager)
-                ))
+                    app=self, cls_or_obj=PlayerManager
+                ),
+            )
+        )
+        menu_view.add_option(
+            MenuOption(
+                option_text="Manage Tournaments",
+                command=commands.LaunchManagerCommand(
+                    app=self, cls_or_obj=TournamentManager
+                )
+            )
+        )
         menu_view.add_option(MenuOption("Exit", command=ExitCurrentCommand(self)))
         self.view(menu_view)
 
