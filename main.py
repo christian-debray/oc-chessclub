@@ -1,6 +1,7 @@
 import logging
 import app
 import types
+import typing
 from dataclasses import dataclass, field
 from time import sleep
 from pathlib import Path
@@ -102,6 +103,19 @@ class MainController(MainController):
         self._views: list[AbstractView] = []
         self._config: AppConfig = AppConfig()
         self._loader: AssetLoader = AssetLoader(cfg=self._config, app=self)
+        #
+        # some features require to store values
+        self._state: dict = {}
+
+    def set_state(self, key: str, value: typing.Any):
+        self._state[key] = value
+
+    def get_state(self, key: str) -> typing.Any:
+        return self._state.get(key)
+
+    def clear_state(self, key: str):
+        if key in self._state:
+            del self._state[key]
 
     def receive(self, command: CommandInterface):
         """Receive a command and add it to the command stack.
