@@ -58,7 +58,6 @@ class TournamentManager(BaseController):
         super().__init__()
         self.main_app: MainController = main_app
         self.tournament_repo: TournamentRepository = tournament_repo
-        self.current_tournament_id = None
 
     def default(self):
         """Launches the player manager: display the menu."""
@@ -85,22 +84,22 @@ class TournamentManager(BaseController):
         menu.add_option(
             MenuOption(
                 option_text="List Tournaments",
-                command=ListTournamentsCommand(
-                    app=self.main_app
-                )))
-        if self.current_tournament_id:
+                command=ListTournamentsCommand(app=self.main_app),
+            )
+        )
+        if current_tournament_id := self.main_app.get_state('current_tournament_id'):
             menu.add_option(
                 MenuOption(
                     option_text="Edit Current Tournament Info",
                     command=EditTournamentInfoCommand(
-                        app=self.main_app, tournament_id=self.current_tournament_id
+                        app=self.main_app, tournament_id=current_tournament_id
                     ),
                 )
             )
         menu.add_option(
             MenuOption(
                 option_text="Return to main menu",
-                alt_key='X',
+                alt_key="X",
                 command=commands.ExitCurrentCommand(self.main_app),
             )
         )
@@ -116,28 +115,44 @@ class TournamentManager(BaseController):
         for other operations.
         """
         if not tournament_id:
-            v = SimpleView(
+            # Come back with a tournament ID...
+            v = tournament_views.SelectTournamentIDView(
                 cmd_manager=self.main_app,
-                title="Load a new Tournament",
-                text="This will 'set' tournament 42 as the current tournament.",
-                command=LoadTournamentCommand(app=self.main_app, tournament_id="42"),
+                confirm_command=LoadTournamentCommand(app=self.main_app),
             )
+            self.main_app.view(v)
+            return
         else:
-            self.current_tournament_id = tournament_id
-            v = SimpleView(
-                cmd_manager=self.main_app,
-                title="Tournament Loaded",
-                text=f"current tournament: {self.current_tournament_id}.",
-            )
-        self.main_app.view(v)
+            reason = ""
+            try:
+                tournament_data = self.tournament_repo.find_tournament_by_id(
+                    tournament_id=tournament_id
+                )
+                if not tournament_data:
+                    reason = "Tournament ID not found"
+                    raise KeyError(reason)
+                self.main_app.set_state('current_tournament_id', tournament_id)
+                tournament_meta = (
+                    tournament_views.TournamentMetaView.tournament_meta_template(
+                        tournament_data.metadata.asdict()
+                    )
+                )
+                self.status.notify_success(f"Tournament loaded: {tournament_meta}")
+            except Exception as e:
+                logger.error(e)
+                self.status.notify_failure(
+                    f"Failed to load tournament data. {reason}\n\
+Please check the tournament ID and files in the tournament data folder."
+                )
+                return
 
     def list_tournaments(self):
         """Display a list of all tournaments."""
         tournaments = self.tournament_repo.list_tournament_meta()
         data = [m.asdict() for m in tournaments]
-        v = tournament_views.TournamentsListView(cmd_manager=self.main_app,
-                                                 title="All Tournaments",
-                                                 tournament_list=data)
+        v = tournament_views.TournamentsListView(
+            cmd_manager=self.main_app, title="All Tournaments", tournament_list=data
+        )
         self.main_app.view(v)
 
     def edit_tournament_info(self, tournament_id: str):

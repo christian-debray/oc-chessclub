@@ -1,6 +1,7 @@
 from app.commands import commands_abc
 from app.views.views_abc import BaseView, AbstractView
 from app.helpers.string_formatters import format_cols, formatdate
+from app.helpers.text_ui import form_field, confirm, prompt_v
 
 
 class TournamentMetaView(AbstractView):
@@ -60,3 +61,65 @@ class TournamentsListView(BaseView):
         return format_cols(
             data=lines, headers=["Tournament_id", "location", "start date", "end date"]
         )
+
+
+class SelectTournamentIDView(AbstractView):
+    """Prompts user for a tournament ID to load as current tournament.
+    """
+    def __init__(self, cmd_manager: commands_abc.CommandManagerInterface,
+                 confirm_command: commands_abc.CommandInterface = None,
+                 cancel_command: commands_abc.CommandInterface = None):
+        super().__init__(cmd_manager)
+        self.confirm_command = confirm_command
+        self.cancel_command = cancel_command
+
+    def render(self):
+        if tournament_id := self.prompt_for_tournament_id():
+            if self.confirm_command:
+                self.confirm_command.set_command_params(tournament_id=tournament_id)
+                self.issuecmd(self.confirm_command)
+        elif self.confirm_command:
+            self.issuecmd(self.cancel_command)
+
+    @staticmethod
+    def prompt_for_tournament_id(prompt_txt: str = None) -> str:
+        """Displays a prompt to enter a tournament ID"""
+        prompt_txt = prompt_txt or "Enter a tournament ID > "
+        return prompt_v(prompt=prompt_txt,
+                        validator=r"^[a-zA-Z0-9\-_]+$",
+                        not_valid_msg="Only alphanumeric characters, hyphen and underscore",
+                        skip_blank=True)
+
+
+class TournamentMetaEditor(BaseView):
+    """Display a form to edit the metadata of a tournament"""
+
+    def __init__(
+        self,
+        cmd_manager: commands_abc.CommandManagerInterface,
+        title: str,
+        data: dict,
+        frozen_fields: list[str] = None,
+        text: str = None,
+        clear_scr: bool = False,
+    ):
+        super().__init__(
+            cmd_manager=cmd_manager, title=title, text=text, clear_scr=clear_scr
+        )
+        self.data = data
+        self.frozen_fields = frozen_fields or []
+
+    def render(self):
+        super().render()
+        self.display_form(self.data, self.frozen_fields)
+
+    @staticmethod
+    def display_form(data: dict, frozen_fields: list[str] = None):
+        for f in data:
+            form_field(
+                field=f,
+                form_data=data,
+                frozen_fields=frozen_fields,
+                display_current=True,
+            )
+        confirm()
