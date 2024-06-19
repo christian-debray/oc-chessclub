@@ -171,11 +171,27 @@ Please check the tournament ID and files in the tournament data folder."
         )
         self.main_app.view(v)
 
-    def edit_tournament_info(self, tournament_id: str):
-        """Edit tournament meta-data."""
-        v = SimpleView(
+    def edit_tournament_info(self, tournament_id: str = None):
+        """Edit tournament meta-data.
+        Some fields may be editable or froze, depending on the tournament's current status.
+        """
+        if not tournament_id:
+            tournament_metadata = self._curr_tournament_meta()
+        else:
+            tournament_metadata = self.tournament_repo.find_tournament_metadata_by_id(tournament_id)
+            if not tournament_metadata:
+                self.status.notify_failure("Tournament not found.")
+                return
+
+        frozen_fields = ['tournament_id', 'data_file', 'status', 'end_date']
+        if tournament_metadata.status in ('running', 'ended'):
+            frozen_fields += ['start_date', 'location', 'turn_count']
+
+        v = tournament_views.TournamentMetaEditor(
             cmd_manager=self.main_app,
-            title="Edit Tournament Info",
-            text=f"This would change the metadata of tournament {tournament_id}",
+            title="Tournament Editor",
+            data=tournament_metadata.asdict(),
+            frozen_fields=frozen_fields,
+            text=f"Edit tournament {self._tournament_meta_str(tournament_metadata)}"
         )
         self.main_app.view(v)

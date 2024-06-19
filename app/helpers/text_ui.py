@@ -65,13 +65,15 @@ def form_field(
     in form_data.
     """
     frozen_fields = frozen_fields or []
-    label = label or field
+    label = label or f"{field}"
     if field in frozen_fields:
         print(f"{label}: {form_data.get(field)}")
         return form_data.get(field)
     else:
         if display_current:
-            label = f"{label} (current={form_data.get(field)})"
+            label = f"{label} (current={form_data.get(field)}): "
+        else:
+            label += ": "
         return prompt_v(
             prompt=label,
             validator=validator,

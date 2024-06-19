@@ -186,6 +186,7 @@ class TournamentMetaData(EntityABC):
     description: str = ''
     data_file: str = ''
     turn_count: int = 4
+    status: str = 'open'
 
     def set_id(self, id: Hashable):
         self.tournament_id = id
@@ -201,7 +202,8 @@ class TournamentMetaData(EntityABC):
             "location": str(self.location),
             "description": str(self.description),
             "data_file": str(self.data_file),
-            "turn_count": self.turn_count
+            "turn_count": self.turn_count,
+            "status": self.status
         }
 
 
@@ -244,6 +246,7 @@ class Tournament():
                 self._player_opponents[mtch.player2().id()].append(mtch.player1().id())
 
         self.update_score_board()
+        self.update_end_date()
 
     def id(self) -> str:
         return self.metadata.id()
@@ -282,6 +285,18 @@ class Tournament():
         """
         return self.turns[-1] is not None and self.turns[-1].has_ended()
 
+    def status(self) -> str:
+        """Returns a string representation of this tournament's current status:
+        'open', 'started', 'ended'.
+        """
+        if not self.has_started():
+            return 'open'
+        if self.has_started and not self.has_ended():
+            return 'running'
+        if self.has_ended():
+            return 'ended'
+        return '(status unknown)'
+
     def update_end_date(self):
         """Update the end date of this tournament.
         """
@@ -289,6 +304,7 @@ class Tournament():
             # find latest endtime in last turn
             end_datetime = min([m.end_time for m in self.turns[-1].matches])
             self.metadata.end_date = date(year=end_datetime.year, month=end_datetime.month, day=end_datetime.day)
+        self.metadata.status = self.status()
 
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player
@@ -470,6 +486,7 @@ class Tournament():
         Useful when exporting to JSON.
         Player objects are converted to their National Player ID.
         """
+        self.update_end_date()
         return {
             'tournament_id': self.id(),
             'metadata': self.metadata.asdict(),
@@ -505,7 +522,8 @@ class TournamentMetaDataJSONDecoder(json.JSONDecoder):
             location=dct['location'],
             description=dct['description'],
             data_file=dct['data_file'],
-            turn_count=int(dct['turn_count'])
+            turn_count=int(dct['turn_count']),
+            status=dct['status']
         )
 
 
