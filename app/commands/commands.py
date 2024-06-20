@@ -37,7 +37,7 @@ class LaunchManagerCommand(CommandInterface):
         self.app = app
         self.cls_or_obj = cls_or_obj
         self.method = method
-        self.params = kwargs
+        self.set_command_params(**kwargs)
 
     def execute(self):
         self.app.launch(cls_or_obj=self.cls_or_obj, method=self.method, **self.params)

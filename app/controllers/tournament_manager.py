@@ -76,6 +76,22 @@ class UpdateTournamentMetaCommand(commands.LaunchManagerCommand):
         )
 
 
+class RegisterPlayerCommand(commands.LaunchManagerCommand):
+    def __init__(
+        self,
+        app: commands.CommandInterface,
+        tournament_id: str = None,
+        player_id: str = None,
+    ) -> None:
+        super().__init__(
+            app=app,
+            cls_or_obj=TournamentManager,
+            method=TournamentManager.register_player,
+            player_id=player_id,
+            tournament_id=tournament_id,
+        )
+
+
 class TournamentManager(BaseController):
     """Manage Tournaments: create and run tournaments."""
 
@@ -97,6 +113,13 @@ class TournamentManager(BaseController):
     def _curr_tournament_meta(self) -> TournamentMetaData:
         if curr_id := self._curr_tournament_id():
             return self.tournament_repo.find_tournament_metadata_by_id(curr_id)
+        return None
+
+    def _curr_tournament(self) -> Tournament:
+        if tournament_id := self._curr_tournament_id():
+            return self.tournament_repo.find_tournament_by_id(
+                tournament_id=tournament_id
+            )
         return None
 
     def _tournament_meta(
@@ -156,7 +179,7 @@ class TournamentManager(BaseController):
                 command=ListTournamentsCommand(app=self.main_app),
             )
         )
-        if current_tournament_id := self.main_app.get_state("current_tournament_id"):
+        if current_tournament_id := self._curr_tournament_id():
             menu.add_option(
                 MenuOption(
                     option_text="Edit Current Tournament Info",
@@ -165,9 +188,18 @@ class TournamentManager(BaseController):
                     ),
                 )
             )
+            if self._curr_tournament_meta().status == "open":
+                menu.add_option(
+                    MenuOption(
+                        option_text="Register Player",
+                        command=RegisterPlayerCommand(
+                            app=self.main_app, tournament_id=current_tournament_id
+                        ),
+                    )
+                )
         menu.add_option(
             MenuOption(
-                option_text="Return to main menu",
+                option_text="Return to previous menu",
                 alt_key="X",
                 command=commands.ExitCurrentCommand(self.main_app),
             )
@@ -321,7 +353,7 @@ Please check the tournament ID and files in the tournament data folder."
                 start_date=u_start_date,
                 location=u_location,
                 description=u_description,
-                turn_count=u_turn_count
+                turn_count=u_turn_count,
             )
             tournament = Tournament(metadata=tournament_meta)
             if self.tournament_repo.store_tournament(tournament):
@@ -334,3 +366,37 @@ Please check the tournament ID and files in the tournament data folder."
         except Exception as e:
             logger.error(e)
             self.status.notify_failure("Failed to store changes: unexpected error.")
+
+    def register_player(self, tournament_id: str = None, player_id: str = None):
+        """Resgister a player to a tournament ID."""
+        tournament = None
+        player = None
+        if not player_id:
+            from app.views.player import player_views
+
+            # request a player ID.
+            player_id_form = player_views.PlayerIDPrompt(
+                cmd_mgr=self.main_app,
+                prompt="Enter the ID of the player joining this tournament > ",
+                confirmCommand=RegisterPlayerCommand(
+                    app=self.main_app, tournament_id=tournament_id
+                ),
+            )
+            self.main_app.view(player_id_form)
+            return
+        try:
+            if tournament_id := tournament_id or self._curr_tournament_id():
+                tournament = self.tournament_repo.find_tournament_by_id(tournament_id)
+            if player_id:
+                player = self.tournament_repo.player_repo.find_by_id(player_id)
+        except Exception:
+            self.status.notify_failure("Invalid player or tournament ID")
+
+        if player and tournament:
+            self.status.notify(
+                f"This would register player {player.name.capitalize()} {player.surname.upper()} ({player_id})"
+            )
+        else:
+            self.status.notify_failure(
+                "Registering  a player requires a valid player ID and a valid tournament."
+            )

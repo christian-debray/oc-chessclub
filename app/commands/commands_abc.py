@@ -14,7 +14,7 @@ class CommandInterface:
     """
     def __init__(self, cycle: bool | int = False) -> None:
         self.cycle = cycle
-        self.params = None
+        self.params = {}
 
     @abstractmethod
     def execute(self):
@@ -23,7 +23,11 @@ class CommandInterface:
     def set_command_params(self, *args, **kwargs):
         """Clients may set parameters before issuing a command.
         """
-        self.params = kwargs or {}
+        if kwargs:
+            if not self.params:
+                self.params = {}
+            for k, v in kwargs.items():
+                self.params[k] = v
 
 
 class CommandManagerInterface:

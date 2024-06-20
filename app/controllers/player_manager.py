@@ -23,13 +23,7 @@ class EditPlayerCommand(commands.LaunchManagerCommand):
         super().__init__(
             app=app, cls_or_obj=PlayerManager, method=PlayerManager.edit_player
         )
-        self.params = {"player_id": player_id}
-
-    def set_player_id(self, player_id):
-        self.params["player_id"] = player_id
-
-    def set_command_params(self, *args, **kwargs):
-        self.set_player_id(*args)
+        self.set_command_params(player_id=player_id)
 
 
 class ListAllPlayersCommand(commands.LaunchManagerCommand):
@@ -94,7 +88,8 @@ class PlayerManager(BaseController):
         )
         menu.add_option(
             MenuOption(
-                option_text="Return to main menu",
+                option_text="Return to previous menu",
+                alt_key="X",
                 command=commands.ExitCurrentCommand(self.main_app),
             )
         )
@@ -110,21 +105,6 @@ class PlayerManager(BaseController):
             update_player_command=NewPlayerDataCommand(app=self.main_app),
         )
         self.main_app.view(editor)
-
-    def select_player(self, player_id):
-        """Selects a player from the database for further operation"""
-        selected_player = None
-        if player_id:
-            selected_player = self.player_repo.find_by_id(player_id)
-        if selected_player is not None:
-            self.status.notify_success(
-                f"Selected player {selected_player.id()}: {selected_player.name} {selected_player.surname}"
-            )
-            return selected_player
-        else:
-            self.status.notify_failure(
-                "Failed to select player - check the National Player ID."
-            )
 
     def edit_player(self, player_id: str | Player = None):
         """Edit player identified by player ID."""

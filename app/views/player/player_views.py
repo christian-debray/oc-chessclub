@@ -163,7 +163,7 @@ class PlayerIDPrompt(AbstractView):
     def render(self):
         val = self.getinput(self.prompt)
         if val is not None and self.confirmcommand:
-            self.confirmcommand.set_command_params(val)
+            self.confirmcommand.set_command_params(player_id=val)
             self.issuecmd(self.confirmcommand)
         elif self.cancelcommand:
             self.issuecmd(self.cancelcommand)
