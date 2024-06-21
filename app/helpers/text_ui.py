@@ -21,6 +21,13 @@ def prompt_v(
 
     If skip_blank is True, skips validation when user input is empty and returns None.
     """
+    keymap = {}
+    if shortcuts:
+        # shortcuts are case-insensitive
+        for k, v in shortcuts.items():
+            keymap[k] = v
+            keymap[k.upper()] = v
+            keymap[k.lower()] = v
     try:
         valid = False
         user_val = None
@@ -28,8 +35,8 @@ def prompt_v(
             user_val = input(prompt)
             if skip_blank and not user_val:
                 raise EOFError
-            if shortcuts and user_val in shortcuts:
-                return shortcuts[user_val]
+            if user_val in keymap:
+                return keymap[user_val]
             if validator is not None:
                 valid = (
                     validator(user_val)
