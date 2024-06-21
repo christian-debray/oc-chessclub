@@ -334,8 +334,8 @@ if __name__ == "__main__":
     logging.basicConfig(filename=logfile, level=logging.DEBUG)
     chessApp = MainController()
     script = None
-    # script = [
-    #     'TournamentManager.load_tournament({"tournament_id": "9ed32c19-4e38-4c48-a1f2-197ac6feb65f"})',
-    #     'TournamentManager.register_player()'
-    # ]
+    script = [
+        'TournamentManager.load_tournament({"tournament_id": "f1fe09f1-62c1-4f8a-87ff-3d12423a8baa"})',
+        'RunningTournamentManager.default()'
+    ]
     chessApp.main(cmd_script=script)

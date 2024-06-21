@@ -4,6 +4,7 @@ from app.helpers.string_formatters import format_cols, formatdate
 from app.helpers.text_ui import form_field, confirm, prompt_v
 import app.helpers.validation as validation
 from app.views.app_status_view import AppStatusView
+from datetime import date, datetime
 
 
 class TournamentMetaView(AbstractView):
@@ -215,3 +216,57 @@ class TournamentMetaEditor(BaseView):
             return user_data
         else:
             self.status.notify_warning("Abandoning changes.")
+
+
+class TournamentDetailsView(AbstractView):
+    """Displays some details about a tournament
+    """
+    def __init__(self,
+                 cmd_manager: commands_abc.CommandManagerInterface,
+                 tournament_id: str,
+                 status: str,
+                 turn_count: int = None,
+                 participants_count: int = None,
+                 location: str = None,
+                 start_date: date = None,
+                 end_date: date = None,
+                 current_turn_idx: int = None,
+                 current_turn_name: str = None,
+                 current_turns_status: str = None,
+                 **kwargs
+                 ):
+        super().__init__(cmd_manager)
+        self.tournament_id = tournament_id
+        self.status = status
+        self.turn_count = turn_count
+        self.participants_count = participants_count
+        self.location = location
+        self.start_date = start_date
+        self.end_date = end_date
+        self.current_turn_idx = current_turn_idx
+        self.current_turn_name = current_turn_name
+        self.current_turns_status = current_turns_status
+
+    def render(self):
+        print(self.details_template())
+
+    def details_template(self):
+        if self.start_date:
+            start_date_str = ", {} {}".format(
+                "scheduled" if self.status == "open" else "started",
+                formatdate(self.start_date, "%d/%m/%Y"))
+        else:
+            start_date_str = " not scheduled yet"
+        if self.end_date and self.status == "ended":
+            end_date_str = f", ended {formatdate(self.end_date, "%d/%m/%Y")}"
+        else:
+            end_date_str = ""
+        tpl = (f"Tournament {self.tournament_id} in {self.location.strip() or "???"}{start_date_str}{end_date_str}")
+        if self.participants_count:
+            tpl += f"\n{self.participants_count} participants"
+        if self.current_turn_idx and self.status == "running":
+            tpl += f"\nRound {self.current_turn_idx}/{self.turn_count}"
+            tpl += f": {self.current_turn_name} ({self.current_turns_status})"
+        elif self.turn_count:
+            tpl += f"\n{self.turn_count} turns"
+        return tpl
