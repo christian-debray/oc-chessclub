@@ -169,10 +169,12 @@ class PlayerIDPrompt(AbstractView):
             self.issuecmd(self.cancelcommand)
 
     @staticmethod
-    def getinput(prompt):
+    def getinput(prompt, shortcuts: dict[str, str] = None):
+
         return prompt_v(
             prompt=f"{prompt}",
             validator=is_valid_national_player_id,
             not_valid_msg="Not a valid Player ID. format: LLDDDDD (ex.: AZ12345)",
             skip_blank=True,
+            shortcuts=shortcuts
         )

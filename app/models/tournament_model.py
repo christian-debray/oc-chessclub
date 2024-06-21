@@ -281,6 +281,14 @@ class Tournament:
         if player not in self.participants:
             self.participants.append(player)
             self._player_opponents[player.id()] = []
+            return True
+        else:
+            return False
+
+    def player_is_registered(self, player_id: str) -> bool:
+        """Checks if a player is already registered in this tournament.
+        """
+        return player_id in self._player_opponents
 
     def set_turns(self, turn_count: int = 4) -> bool:
         """Sets how many turns this torunament will last (the default is 4).

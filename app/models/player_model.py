@@ -71,6 +71,9 @@ class Player(EntityABC):
             and validation.is_valid_name(self.name)
         )
 
+    def __str__(self) -> str:
+        return f"{self.name.capitalize()} {self.surname.upper()} ({self.id()})"
+
     @classmethod
     def copy(cls, other_player: "Player"):
         """Copies all data from one player ot a new Player object."""

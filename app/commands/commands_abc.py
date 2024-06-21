@@ -35,7 +35,7 @@ class CommandManagerInterface:
     """
 
     @abstractmethod
-    def receive(self, cmd: CommandInterface):
+    def receive(self, *cmd: CommandInterface):
         pass
 
     @abstractmethod
@@ -63,9 +63,11 @@ class CommandIssuer:
     def __init__(self, cmd_manager: CommandManagerInterface):
         self.cmd_manager = cmd_manager
 
-    def issuecmd(self, cmd: CommandInterface = None):
+    def issuecmd(self, cmd: CommandInterface | list[CommandInterface] = None):
         """Helper method to issue a command.
         Won't do anything if no command manager is set.
         """
-        if self.cmd_manager and cmd:
-            self.cmd_manager.receive(cmd)
+        if not self.cmd_manager or not cmd:
+            return
+        cmd_list = cmd if isinstance(cmd, list) else [cmd]
+        self.cmd_manager.receive(*cmd_list)

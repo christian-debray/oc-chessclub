@@ -13,9 +13,11 @@ def prompt_v(
     validator: str | Callable = None,
     not_valid_msg: str = None,
     skip_blank=False,
+    shortcuts: dict[str, str] = None
 ):
-    """Prompts user for input and validates the input.
-    Returns value only if validated.
+    """Prompts user for input and validates the input, with a basic support for shortcuts.
+    Returns value only if validated, or the value associated with a shortuct if the shortcut is
+    entered by the user.
 
     If skip_blank is True, skips validation when user input is empty and returns None.
     """
@@ -26,6 +28,8 @@ def prompt_v(
             user_val = input(prompt)
             if skip_blank and not user_val:
                 raise EOFError
+            if shortcuts and user_val in shortcuts:
+                return shortcuts[user_val]
             if validator is not None:
                 valid = (
                     validator(user_val)

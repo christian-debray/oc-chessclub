@@ -72,7 +72,7 @@ class TestPlayerRepository(unittest.TestCase):
             birthdate=date(1985, 8, 19)
         )
         dumped = json.dumps(new_player, cls=player_model.PlayerJSONEncoder)
-        expected_json = '{"national_player_id": "AZ12345", "surname": "Doe",\
+        expected_json = '{"national_player_id": "AZ12345", "surname": "Doe", \
 "name": "John", "birthdate": "1985-08-19"}'
         self.assertEqual(dumped, expected_json)
 

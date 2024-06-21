@@ -211,6 +211,10 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertIsInstance(loaded, tournament_model.TournamentMetaData)
         self.assertEqual(tournament.metadata, loaded)
 
+
+class TestTournament(unittest.TestCase):
+    """Test running a tournament."""
+
     def test_match_start(self):
         """Starting a match sets the startime."""
         p1 = utils.make_random_player()
@@ -350,6 +354,21 @@ class TestTournamentJSON(unittest.TestCase):
             tournament.add_participant(p)
             self.assertEqual(tournament.player_score(p.id()), 0.0)
         self.assertIs(tournament.has_started(), False)
+
+    def test_player_is_registered(self):
+        """When adding a participant, player_is_registered() should return True
+        with the player's ID."""
+        tournament = tournament_model.Tournament(
+            metadata=utils.make_tournament_metadata()
+        )
+        player = utils.make_random_player()
+        player.set_id('FR12345')
+        self.assertEqual(player.id(), 'FR12345')
+        tournament.add_participant(player)
+        self.assertIs(tournament.player_is_registered('FR12345'), True)
+        self.assertIs(tournament.player_is_registered(player.id()), True)
+        self.assertIs(tournament.player_is_registered('FR 12345'), False)
+        self.assertIs(tournament.player_is_registered('FR54321'), False)
 
     def test_start_first_turn(self):
         """Starting the first Turn starts the tournament and sets up matches for all pairs of players.
