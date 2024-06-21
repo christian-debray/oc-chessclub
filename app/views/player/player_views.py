@@ -111,15 +111,10 @@ class PlayerEditor(AbstractView):
         elif playerdata['surname']:
             self.status.notify_warning(f"Keeping previous value: {playerdata['surname']}\n")
 
-        id_prompt = (
-            "National Player ID"
-            if not playerdata.get('national_player_id')
-            else f"National Player ID (current= {playerdata.get('national_player_id')})"
-        ) + ":\n"
-        if new_national_player_id := PlayerIDPrompt.getinput(prompt=id_prompt):
-            edited_player['national_player_id'] = new_national_player_id
-        elif playerdata['national_player_id']:
-            self.status.notify_warning(f"Keeping previous value: {playerdata['national_player_id']}\n")
+        # dont't prompt for ID when player is already registered...
+        if not playerdata.get('national_player_id'):
+            if new_national_player_id := PlayerIDPrompt.getinput(prompt="National Player ID:\n"):
+                edited_player['national_player_id'] = new_national_player_id
 
         birthdate_prompt = (
             "Birthdate"

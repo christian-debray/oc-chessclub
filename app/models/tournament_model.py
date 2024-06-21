@@ -774,7 +774,7 @@ class TournamentRepository:
                     raise KeyError("Duplicate Player ID in participants data")
                 player_list[player_id_str] = pl
             else:
-                raise KeyError("Player ID not found in repository")
+                raise KeyError(f"Player ID not found in repository: '{player_id_str}'")
         return player_list
 
 

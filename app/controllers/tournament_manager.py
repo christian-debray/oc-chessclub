@@ -280,9 +280,9 @@ class TournamentManager(BaseController):
                 tournament_meta_str = self._tournament_meta_str(tournament.metadata)
                 self.status.notify_success(f"Tournament loaded: {tournament_meta_str}")
             except Exception as e:
-                logger.error(e)
+                logger.error(e, stack_info=True)
                 self.status.notify_failure(
-                    f"Failed to load tournament data. {reason}\n\
+                    f"Failed to load tournament data. {reason or e}\n\
 Please check the tournament ID and files in the tournament data folder."
                 )
                 return
