@@ -212,8 +212,8 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertEqual(tournament.metadata, loaded)
 
 
-class TestTournament(unittest.TestCase):
-    """Test running a tournament."""
+class TestMatch(unittest.TestCase):
+    """Test Match"""
 
     def test_match_start(self):
         """Starting a match sets the startime."""
@@ -313,6 +313,10 @@ class TestTournament(unittest.TestCase):
         self.assertEqual(match.player_score(p2.id()), 0.0)
         self.assertEqual(match.scores(), ((p1, 1.0), (p2, 0.0)))
 
+
+class TestTurn(unittest.TestCase):
+    """Test the Turn class"""
+
     def test_turn_setup(self):
         """Setting up a Turn with a list of pairs of players
         will create as many matches, and no match has started yet."""
@@ -342,6 +346,10 @@ class TestTournament(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertEqual(m, turn.matches[4])
         self.assertEqual(m.player2(), player)
+
+
+class TestTournament(unittest.TestCase):
+    """Test the tournament class."""
 
     def test_add_participant(self):
         """When adding a new participant, the player's score must equal 0

@@ -255,7 +255,6 @@ class MainController(MainController):
             err_msg = f"Error in commands script at line {line}: {e}"
             logger.error(err_msg, stack_info=True)
             print(err_msg)
-            
             return []
         return script
 

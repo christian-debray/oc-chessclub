@@ -233,10 +233,6 @@ class Tournament:
         - turns:
         - current_turn:
         """
-        if participants is not None and len(participants) % 2 > 0:
-            raise ValueError(
-                "Tournament requires even number of participants; uneven list given."
-            )
         if turns is not None and len(turns) != metadata.turn_count:
             raise ValueError("Turn count mismatch.")
         self.metadata: TournamentMetaData = metadata
@@ -262,6 +258,10 @@ class Tournament:
 
         self.update_score_board()
         self.update_end_date()
+        if participants and self.has_started() and len(participants) % 2 > 0:
+            raise ValueError(
+                "Running or Ended Tournament require even number of participants; uneven list given."
+            )
 
     def id(self) -> str:
         return self.metadata.id()
