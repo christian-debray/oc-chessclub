@@ -2,6 +2,8 @@ from app.commands.commands_abc import CommandInterface, CommandManagerInterface
 from app.views.views_abc import AbstractView
 from app.views.player.player_views import PlayerIDPrompt, PlayerView
 from app.helpers.text_ui import confirm
+from app.helpers.ansi import Formatter
+from app.views.dialogs import Dialog
 
 
 class RegisterTournamentView(AbstractView):
@@ -19,16 +21,19 @@ class RegisterTournamentView(AbstractView):
         list_available_players_cmd: CommandInterface = None,
         list_registered_players_cmd: CommandInterface = None,
         confirm_cmd: CommandInterface = None,
+        new_player_cmd: CommandInterface = None,
         cancel_cmd: CommandInterface = None,
     ):
         super().__init__(cmd_manager=cmd_manager)
         self.title = title or "Register a player to a tournament"
         self.cancel_cmd: CommandInterface = cancel_cmd
         self.confirm_cmd: CommandInterface = confirm_cmd
+        self.new_player_cmd: CommandInterface = new_player_cmd
         self.list_available_players_cmd = list_available_players_cmd
         self.list_registered_players_cmd = list_registered_players_cmd
         self.list_available_key = "A"
         self.list_registered_key = "R"
+        self.new_player_key = "N"
 
     def render(self):
         print("\n")
@@ -47,19 +52,20 @@ class RegisterTournamentView(AbstractView):
                 f"'{self.list_registered_key}' then <enter> to display current participants list"
             )
             shortcuts[self.list_registered_key] = self.list_registered_key
-
+        if self.new_player_cmd:
+            keys.append(f"'{self.new_player_key}' then <enter> to create a new player")
+            shortcuts[self.new_player_key] = self.new_player_key
         print("Enter the National Player ID to register.\n" + "\n  ".join(keys))
-        player_id = PlayerIDPrompt.getinput(
-            prompt="Player ID > ",
-            shortcuts=shortcuts
-        )
+        player_id = PlayerIDPrompt.getinput(prompt="Player ID > ", shortcuts=shortcuts)
 
         if not player_id:
             self.issuecmd(self.cancel_cmd)
-        elif player_id == self.list_available_key:
+        elif player_id.upper() == self.list_available_key:
             self.issuecmd(self.list_available_players_cmd)
-        elif player_id == self.list_registered_key:
+        elif player_id.upper() == self.list_registered_key:
             self.issuecmd(self.list_registered_players_cmd)
+        elif player_id.upper() == self.new_player_key:
+            self.issuecmd(self.new_player_cmd)
         elif self.confirm_cmd:
             self.confirm_cmd.set_command_params(player_id=player_id)
             self.issuecmd(self.confirm_cmd)
@@ -90,3 +96,25 @@ class ConfirmPlayerIDView(AbstractView):
                 self.issuecmd(self.confirm_cmd)
         elif self.cancel_cmd:
             self.issuecmd(self.cancel_cmd)
+
+
+class RegisterPlayerSuccess(Dialog):
+    def __init__(
+        self,
+        cmd_manager: CommandManagerInterface,
+        player_str: str,
+        tournament_str: str,
+        confirm_cmd: CommandInterface = None,
+        abandon_cmd: CommandInterface = None,
+    ):
+        super().__init__(
+            cmd_manager=cmd_manager,
+            title=None,
+            text=None,
+            confirm_cmd=confirm_cmd,
+            abandon_cmd=abandon_cmd,
+        )
+        self.text = Formatter.format(
+            f"Player {player_str} joined tournament {tournament_str}.", Formatter.GREEN
+        )
+        self.text += "\nDo you wish to register another player ?"

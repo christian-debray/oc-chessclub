@@ -13,8 +13,10 @@ from app.views.tournament import tournament_views
 from app.views.tournament.register_player_tournament import (
     RegisterTournamentView,
     ConfirmPlayerIDView,
+    RegisterPlayerSuccess
 )
 from app.views.player.player_views import PlayerListView
+from app.controllers import player_manager
 import logging
 
 logger = logging.getLogger()
@@ -449,6 +451,10 @@ Please check the tournament ID and files in the tournament data folder."
                     RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id()),
                     ListRegisteredPlayersCommand(app=self.main_app, tournament_id=tournament.id())
                 ],
+                new_player_cmd=[
+                    RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id()),
+                    player_manager.RegisterPlayerCommand(app=self.main_app)
+                ],
                 cancel_cmd=None,
             )
             self.main_app.view(player_id_form)
@@ -515,11 +521,17 @@ Please check the tournament ID and files in the tournament data folder."
             if not tournament.add_participant(player):
                 reason = f"Failed to add player {player.id()} to participants list in tournament {tournament.id()}."
                 raise Exception(reason)
-            # all checks passed, store the tournament and return.
+            # all checks passed, store the tournament,
+            # display success message
+            # and offer to register a new player.
             if self.tournament_repo.store_tournament(tournament=tournament):
-                self.status.notify_success(
-                    f"Player {player} joined tournament {tournament.id()}"
+                v = RegisterPlayerSuccess(
+                    cmd_manager=self.main_app,
+                    player_str=str(player),
+                    tournament_str=tournament.id(),
+                    confirm_cmd=RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id())
                 )
+                self.main_app.view(v)
                 return
         except Exception as e:
             logger.error(f"Failed to update tournament after registering player: {e}")
