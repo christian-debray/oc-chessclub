@@ -88,18 +88,31 @@ class RegisterPlayerCommand(commands.LaunchManagerCommand):
     def __init__(
         self,
         app: commands.CommandInterface,
-        tournament_id: str,
-        player_id: str = None,
-        confirmed: bool = False,
+        tournament_id: str = None,
+        player_id: str = None
     ) -> None:
         super().__init__(
             app=app,
             cls_or_obj=TournamentManager,
             method=TournamentManager.register_player,
             player_id=player_id,
-            tournament_id=tournament_id,
-            confirmed=confirmed,
+            tournament_id=tournament_id
         )
+
+
+class RequirePlayerForRegistrationCommand(commands.LaunchManagerCommand):
+    def __init__(self,
+                 app: commands.CommandManagerInterface,
+                 tournament_id: str = None,
+                 player_id: str = None,
+                 confirmed: bool = False
+                 ) -> None:
+        super().__init__(app,
+                         cls_or_obj=TournamentManager,
+                         method=TournamentManager.require_player_id_for_registration,
+                         tournament_id=tournament_id,
+                         player_id=player_id,
+                         confirmed=confirmed)
 
 
 class ListRegisteredPlayersCommand(commands.LaunchManagerCommand):
@@ -419,9 +432,13 @@ Please check the tournament ID and files in the tournament data folder."
             self.status.notify_failure("Failed to store changes: unexpected error.")
 
     def register_player(
-        self, tournament_id: str = None, player_id: str = None, confirmed: bool = False
+        self, tournament_id: str = None, player_id: str = None
     ):
-        """Register a player to a tournament ID."""
+        """Register a player in a tournament.
+
+        Tournament_id defaults to the current tournament.
+
+        """
         player = None
         tournament = self._get_tournament(tournament_id=tournament_id)
         if tournament is None:
@@ -434,88 +451,29 @@ Please check the tournament ID and files in the tournament data folder."
             return
 
         if not player_id:
-            # request a player ID.
-            # help the user a bit:
-            #
-            # provide the list of players already registered,
-            # and the list of available player IDs (ie not registered yet)
-
-            player_id_form = RegisterTournamentView(
-                cmd_manager=self.main_app,
-                confirm_cmd=RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id()),
-                list_available_players_cmd=[
-                    RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id()),
-                    ListAvailablePlayersCommand(app=self.main_app, tournament_id=tournament.id())
-                ],
-                list_registered_players_cmd=[
-                    RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id()),
-                    ListRegisteredPlayersCommand(app=self.main_app, tournament_id=tournament.id())
-                ],
-                new_player_cmd=[
-                    RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id()),
-                    player_manager.RegisterPlayerCommand(app=self.main_app)
-                ],
-                cancel_cmd=None,
-            )
-            self.main_app.view(player_id_form)
+            self.require_player_id_for_registration(tournament_id=tournament_id)
             return
 
         # Validate the player ID:
         # when validation fails, display an error message
         # and issue a command to try again with a different Player ID
-        fail_cmd = RegisterPlayerCommand(
-            app=self.main_app,
-            tournament_id=tournament.id(),
-            player_id=None,
-            confirmed=False,
-        )
+
         try:
             if player_id:
                 player = self.player_repo.find_by_id(player_id)
-        except Exception:
-            self.status.notify_failure("Invalid player ID.")
+            if not player:
+                raise KeyError(f"Player not found ({player_id})")
+            if tournament.player_is_registered(player.id()):
+                raise ValueError(f"Player {player} is already registered in tournament {tournament.id()}")
+        except Exception as e:
+            self.status.notify_failure(f"Invalid player: {e}")
+            fail_cmd = RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id())
             self.main_app.receive(fail_cmd)
-            return
-
-        if not player:
-            self.status.notify_failure("Player not found, check the ID.")
-            self.main_app.receive(fail_cmd)
-            return
-
-        if tournament.player_is_registered(player.id()):
-            self.status.notify_failure(
-                f"Player {player} already registered in tournament {tournament.id()}."
-            )
-            self.main_app.receive(fail_cmd)
-            return
-
-        if not confirmed:
-            # Player ID is valid, still we'll ask the user to confirm the player
-            # by displaying it's full details
-            # if the user does not validate the player, ask for a new player ID
-            v = ConfirmPlayerIDView(
-                cmd_manager=self.main_app,
-                playerdata=player.asdict(),
-                tournament_id=tournament.id(),
-                confirm_cmd=RegisterPlayerCommand(
-                    app=self.main_app,
-                    tournament_id=tournament.id(),
-                    player_id=player.id(),
-                    confirmed=True,
-                ),
-                cancel_cmd=RegisterPlayerCommand(
-                    app=self.main_app,
-                    tournament_id=tournament.id(),
-                    player_id=None,
-                    confirmed=False,
-                ),
-            )
-            self.main_app.view(v)
             return
 
         # At this stage, the player_id and tournament_id are validated,
         # and the user confirmed his choice.
-        # Let's proceed to the actual registration
+        # Let's proceed with the actual registration
         reason = None
         try:
             if not tournament.add_participant(player):
@@ -535,6 +493,7 @@ Please check the tournament ID and files in the tournament data folder."
                 return
         except Exception as e:
             logger.error(f"Failed to update tournament after registering player: {e}")
+            reason = str(e)
         reason = reason or "for an unexpected reason"
         self.status.notify_failure(f"Failed to register player {reason}.")
 
@@ -552,6 +511,77 @@ Please check the tournament ID and files in the tournament data folder."
         except Exception:
             self.status.notify_failure("Invalid tournament ID")
         return tournament
+
+    def require_player_id_for_registration(self, tournament_id: str, player_id: str = None, confirmed: bool = False):
+        """Get a Player ID to register to a tournament.
+
+        Asks for confirmation once a valid player ID has been selected,
+        then proceeds to registration.
+        """
+        tournament = self._get_tournament(tournament_id or self._curr_tournament_id())
+        if not player_id:
+            # request a player ID.
+            # help the user a bit:
+            #
+            # provide the list of players already registered,
+            # and the list of available player IDs (ie not registered yet)
+
+            player_id_form = RegisterTournamentView(
+                cmd_manager=self.main_app,
+                confirm_cmd=RequirePlayerForRegistrationCommand(app=self.main_app, tournament_id=tournament.id()),
+                list_available_players_cmd=[
+                    RequirePlayerForRegistrationCommand(app=self.main_app, tournament_id=tournament.id()),
+                    ListAvailablePlayersCommand(app=self.main_app, tournament_id=tournament.id())
+                ],
+                list_registered_players_cmd=[
+                    RequirePlayerForRegistrationCommand(app=self.main_app, tournament_id=tournament.id()),
+                    ListRegisteredPlayersCommand(app=self.main_app, tournament_id=tournament.id())
+                ],
+                new_player_cmd=[
+                    RequirePlayerForRegistrationCommand(app=self.main_app, tournament_id=tournament.id()),
+                    player_manager.RegisterPlayerCommand(app=self.main_app)
+                ],
+                cancel_cmd=None,
+            )
+            self.main_app.view(player_id_form)
+            return
+
+        player = None
+        try:
+            if player_id:
+                player = self.player_repo.find_by_id(player_id)
+            if not player:
+                raise KeyError(f"Player not found: {player_id}")
+            if tournament.player_is_registered(player.id()):
+                raise ValueError(f"Player {player} is already registered.")
+
+        except Exception as e:
+            self.status.notify_failure(f"Can't register this player: {e}")
+            self.main_app.receive(
+                RequirePlayerForRegistrationCommand(app=self.main_app, tournament_id=tournament.id())
+                )
+            return
+
+        if not confirmed:
+            # Player ID is valid, still we'll ask the user to confirm the player
+            # by displaying it's full details
+            # if the user does not validate the player, ask for a new player ID
+            v = ConfirmPlayerIDView(
+                cmd_manager=self.main_app,
+                playerdata=player.asdict(),
+                tournament_id=tournament.id(),
+                confirm_cmd=RegisterPlayerCommand(
+                    app=self.main_app,
+                    tournament_id=tournament.id(),
+                    player_id=player.id()
+                ),
+                cancel_cmd=RequirePlayerForRegistrationCommand(
+                    app=self.main_app,
+                    tournament_id=tournament.id()
+                ),
+            )
+            self.main_app.view(v)
+            return
 
     def list_registered_players(self, tournament_id: str = None):
         """Display a list of players registered in a tournament"""
