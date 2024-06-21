@@ -143,7 +143,7 @@ class ListAvailablePlayersCommand(commands.LaunchManagerCommand):
         )
 
 
-class TournamentManager(BaseController):
+class TournamentManagerBase(BaseController):
     """Manage Tournaments: create and run tournaments."""
 
     def __init__(
@@ -172,12 +172,54 @@ class TournamentManager(BaseController):
             return self.tournament_repo.find_tournament_metadata_by_id(curr_id)
         return None
 
+    def _tournament_meta_str(self, meta: TournamentMetaData) -> str:
+        """Return a simple string view of a tournament metadata"""
+        return tournament_views.TournamentMetaView.tournament_meta_template(
+            meta.asdict()
+        )
+
     def _curr_tournament(self) -> Tournament:
         if tournament_id := self._curr_tournament_id():
             return self.tournament_repo.find_tournament_by_id(
                 tournament_id=tournament_id
             )
         return None
+
+    def _get_tournament(self, tournament_id: str) -> Tournament:
+        """Retrieves a tournament from the repository after validating the tournament_id.
+
+        Notify the user when tournament_id is not valid.
+        """
+        tournament = None
+        try:
+            if tournament_id := tournament_id or self._curr_tournament_id():
+                tournament = self.tournament_repo.find_tournament_by_id(tournament_id)
+            if not tournament:
+                self.status.notify_failure(f"Tournament not found: {tournament_id}")
+        except Exception:
+            self.status.notify_failure("Invalid tournament ID")
+        return tournament
+
+
+class TournamentManager(TournamentManagerBase):
+    """Manage Tournaments: create and run tournaments."""
+
+    def __init__(
+        self,
+        player_repo: PlayerRepository,
+        tournament_repo: TournamentRepository,
+        main_app: MainController,
+    ):
+        super().__init__(player_repo=player_repo,
+                         tournament_repo=tournament_repo,
+                         main_app=main_app)
+
+    def default(self):
+        """Launches the player manager: display the menu."""
+        menu_command = commands.DisplayMenuCommand(
+            app=self.main_app, cls_or_obj=TournamentManager, cycle=True
+        )
+        self.main_app.receive(menu_command)
 
     def _tournament_meta(
         self, tournament_id: str = None, notify_failure: bool = True
@@ -198,12 +240,6 @@ class TournamentManager(BaseController):
         if not tournament_metadata and notify_failure:
             self.status.notify_failure("Tournament not found.")
         return tournament_metadata
-
-    def _tournament_meta_str(self, meta: TournamentMetaData) -> str:
-        """Return a simple string view of a tournament metadata"""
-        return tournament_views.TournamentMetaView.tournament_meta_template(
-            meta.asdict()
-        )
 
     def menu(self):
         """Load the Tournament manager menu"""
@@ -279,6 +315,10 @@ class TournamentManager(BaseController):
             v = tournament_views.SelectTournamentIDView(
                 cmd_manager=self.main_app,
                 confirm_command=LoadTournamentCommand(app=self.main_app),
+                list_command=[
+                    LoadTournamentCommand(app=self.main_app),
+                    ListTournamentsCommand(app=self.main_app)
+                    ]
             )
             self.main_app.view(v)
             return
@@ -496,21 +536,6 @@ Please check the tournament ID and files in the tournament data folder."
             reason = str(e)
         reason = reason or "for an unexpected reason"
         self.status.notify_failure(f"Failed to register player {reason}.")
-
-    def _get_tournament(self, tournament_id: str) -> Tournament:
-        """Retrieves a tournament from the repository after validating the tournament_id.
-
-        Notify the user when tournament_id is not valid.
-        """
-        tournament = None
-        try:
-            if tournament_id := tournament_id or self._curr_tournament_id():
-                tournament = self.tournament_repo.find_tournament_by_id(tournament_id)
-            if not tournament:
-                self.status.notify_failure(f"Tournament not found: {tournament_id}")
-        except Exception:
-            self.status.notify_failure("Invalid tournament ID")
-        return tournament
 
     def require_player_id_for_registration(self, tournament_id: str, player_id: str = None, confirmed: bool = False):
         """Get a Player ID to register to a tournament.

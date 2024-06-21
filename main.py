@@ -14,7 +14,9 @@ from app.views.menu import MenuOption, Menu
 from app.models.player_model import PlayerRepository
 from app.controllers.player_manager import PlayerManager
 from app.models.tournament_model import TournamentRepository
-from app.controllers.tournament_manager import TournamentManager
+from app.controllers import tournament_manager, running_tournament_manager
+# from app.controllers.tournament_manager import TournamentManager
+# from app.controllers.running_tournament_manager import RunningTournamentManager
 
 logger = logging.getLogger()
 
@@ -36,6 +38,7 @@ class AssetLoader:
         self.player_repo = None
         self.tournament_repo = None
         self.tournament_manager = None
+        self.running_tournament_manager = None
         self.app: MainController = app
 
     def load(self, cls) -> BaseController:
@@ -50,8 +53,10 @@ class AssetLoader:
                 return self.load_player_repository()
             case TournamentRepository.__name__:
                 return self.load_tournament_repository()
-            case TournamentManager.__name__:
+            case tournament_manager.TournamentManager.__name__:
                 return self.load_tournament_manager()
+            case running_tournament_manager.RunningTournamentManager.__name__:
+                return self.load_running_tournament_manager()
         raise ValueError(f"Failed to load instance of unknown class {cls_n}.")
 
     def load_player_repository(self) -> PlayerRepository:
@@ -70,14 +75,23 @@ class AssetLoader:
             )
         return self.tournament_repo
 
-    def load_tournament_manager(self) -> TournamentManager:
+    def load_tournament_manager(self) -> tournament_manager.TournamentManager:
         if not self.tournament_manager:
-            self.tournament_manager = TournamentManager(
+            self.tournament_manager = tournament_manager.TournamentManager(
                 player_repo=self.load_player_repository(),
                 tournament_repo=self.load_tournament_repository(),
                 main_app=self.app,
             )
         return self.tournament_manager
+
+    def load_running_tournament_manager(self) -> running_tournament_manager.RunningTournamentManager:
+        if not self.running_tournament_manager:
+            self.running_tournament_manager = running_tournament_manager.RunningTournamentManager(
+                player_repo=self.load_player_repository(),
+                tournament_repo=self.load_tournament_repository(),
+                main_app=self.app,
+            )
+        return self.running_tournament_manager
 
 
 class MainMenuCommand(CommandInterface):
@@ -162,7 +176,6 @@ class MainController(MainController):
         """Loads the main menu in the views store."""
         logger.debug("Preparing the main menu.")
         menu_view = Menu("Chess Club Main Menu", cmdManager=self)
-        menu_view.add_option(MenuOption(option_text="First option - does nothing"))
         menu_view.add_option(
             MenuOption(
                 option_text="Manage Players",
@@ -175,10 +188,26 @@ class MainController(MainController):
             MenuOption(
                 option_text="Manage Tournaments",
                 command=commands.LaunchManagerCommand(
-                    app=self, cls_or_obj=TournamentManager
+                    app=self, cls_or_obj=tournament_manager.TournamentManager
                 ),
             )
         )
+        if self.get_state('current_tournament_id'):
+            menu_view.add_option(
+                MenuOption(
+                    option_text="Current Tournament",
+                    command=commands.LaunchManagerCommand(
+                        app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
+                    )
+                )
+            )
+        else:
+            menu_view.add_option(
+                MenuOption(
+                    option_text="Set current tournament",
+                    command=tournament_manager.LoadTournamentCommand(app=self)
+                )
+            )
         menu_view.add_option(
             MenuOption(
                 option_text="Exit", alt_key="X", command=ExitCurrentCommand(self)

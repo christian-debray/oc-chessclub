@@ -75,28 +75,45 @@ class SelectTournamentIDView(AbstractView):
         cmd_manager: commands_abc.CommandManagerInterface,
         confirm_command: commands_abc.CommandInterface = None,
         cancel_command: commands_abc.CommandInterface = None,
+        list_command: commands_abc.CommandInterface = None
     ):
         super().__init__(cmd_manager)
         self.confirm_command = confirm_command
         self.cancel_command = cancel_command
+        self.list_command = list_command
+        self.list_key = "L"
 
     def render(self):
-        if tournament_id := self.prompt_for_tournament_id():
-            if self.confirm_command:
+        print("\n")
+        instructions = "Enter tournament ID to select a tournament"
+        instructions += "\n   or (<ctrl>+D or enter to skip)"
+        if self.list_command:
+            shortcuts = {self.list_key: self.list_key}
+            instructions += f"\n   or '{self.list_key}' and enter to list tournaments"
+        else:
+            shortcuts = {}
+        print(instructions)
+        if tournament_id := self.prompt_for_tournament_id(prompt_txt="tournament ID > ", shortcuts=shortcuts):
+            if tournament_id == self.list_key:
+                self.issuecmd(self.list_command)
+            elif self.confirm_command:
                 self.confirm_command.set_command_params(tournament_id=tournament_id)
                 self.issuecmd(self.confirm_command)
-        elif self.confirm_command:
+        else:
             self.issuecmd(self.cancel_command)
 
     @staticmethod
-    def prompt_for_tournament_id(prompt_txt: str = None) -> str:
+    def prompt_for_tournament_id(prompt_txt: str = None, shortcuts: dict[str, str] = None, text: str = None) -> str:
         """Displays a prompt to enter a tournament ID"""
+        if text:
+            print(text)
         prompt_txt = prompt_txt or "Enter a tournament ID > "
         return prompt_v(
             prompt=prompt_txt,
             validator=r"^[a-zA-Z0-9\-_]+$",
             not_valid_msg="Only alphanumeric characters, hyphen and underscore",
             skip_blank=True,
+            shortcuts=shortcuts
         )
 
 
