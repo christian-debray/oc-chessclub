@@ -89,9 +89,8 @@ class ConfirmPlayerIDView(Dialog):
             )
         self.playerdata = playerdata
         self.tournament_id = tournament_id
-        self.text = f"""This player will be registered to tournament {self.tournament_id}:
-{PlayerView.player_template(self.playerdata)}
-"""
+        self.text = f"This player will be registered in tournament {self.tournament_id}:\n"
+        self.text += PlayerView.player_template(self.playerdata)
 
 
 class RegisterPlayerSuccess(Dialog):
@@ -111,6 +110,6 @@ class RegisterPlayerSuccess(Dialog):
             abandon_cmd=abandon_cmd,
         )
         self.text = ansi.Formatter.format(
-            f"Player {player_str} joined tournament {tournament_str}.", ansi.Formatter.GREEN
+            f"Player {player_str} joined tournament {tournament_str}.", ansi.Formatter.LIGHT_GREEN
         )
         self.text += "\nDo you wish to register another player ?"
