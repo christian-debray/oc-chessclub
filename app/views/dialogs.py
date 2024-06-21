@@ -1,6 +1,7 @@
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
 from app.views.views_abc import BaseView
 from app.helpers.text_ui import confirm
+from app.helpers import ansi
 
 
 class Dialog(BaseView):
@@ -27,4 +28,5 @@ class Dialog(BaseView):
         if confirm():
             self.issuecmd(self.confirm_cmd)
         else:
+            print(ansi.Formatter.format("Abandon", ansi.Formatter.YELLOW))
             self.issuecmd(self.abandon_cmd)

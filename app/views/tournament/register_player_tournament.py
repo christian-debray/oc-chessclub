@@ -1,8 +1,7 @@
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
 from app.views.views_abc import AbstractView
 from app.views.player.player_views import PlayerIDPrompt, PlayerView
-from app.helpers.text_ui import confirm
-from app.helpers.ansi import Formatter
+from app.helpers import ansi
 from app.views.dialogs import Dialog
 
 
@@ -71,7 +70,7 @@ class RegisterTournamentView(AbstractView):
             self.issuecmd(self.confirm_cmd)
 
 
-class ConfirmPlayerIDView(AbstractView):
+class ConfirmPlayerIDView(Dialog):
     """Confirm Player ID before registration to a tournament."""
 
     def __init__(
@@ -80,22 +79,19 @@ class ConfirmPlayerIDView(AbstractView):
         playerdata: dict,
         tournament_id: str,
         confirm_cmd: CommandInterface = None,
-        cancel_cmd: CommandInterface = None,
+        abandon_cmd: CommandInterface = None,
     ):
-        super().__init__(cmd_manager=cmd_manager)
+        super().__init__(
+            cmd_manager=cmd_manager,
+            title=None,
+            confirm_cmd=confirm_cmd,
+            abandon_cmd=abandon_cmd
+            )
         self.playerdata = playerdata
         self.tournament_id = tournament_id
-        self.cancel_cmd: CommandInterface = cancel_cmd
-        self.confirm_cmd: CommandInterface = confirm_cmd
-
-    def render(self):
-        print(f"This player will be registered to tournament {self.tournament_id}")
-        print(PlayerView.player_template(self.playerdata))
-        if confirm():
-            if self.confirm_cmd:
-                self.issuecmd(self.confirm_cmd)
-        elif self.cancel_cmd:
-            self.issuecmd(self.cancel_cmd)
+        self.text = f"""This player will be registered to tournament {self.tournament_id}:
+{PlayerView.player_template(self.playerdata)}
+"""
 
 
 class RegisterPlayerSuccess(Dialog):
@@ -114,7 +110,7 @@ class RegisterPlayerSuccess(Dialog):
             confirm_cmd=confirm_cmd,
             abandon_cmd=abandon_cmd,
         )
-        self.text = Formatter.format(
-            f"Player {player_str} joined tournament {tournament_str}.", Formatter.GREEN
+        self.text = ansi.Formatter.format(
+            f"Player {player_str} joined tournament {tournament_str}.", ansi.Formatter.GREEN
         )
         self.text += "\nDo you wish to register another player ?"

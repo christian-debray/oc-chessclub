@@ -575,7 +575,7 @@ Please check the tournament ID and files in the tournament data folder."
                     tournament_id=tournament.id(),
                     player_id=player.id()
                 ),
-                cancel_cmd=RequirePlayerForRegistrationCommand(
+                abandon_cmd=RequirePlayerForRegistrationCommand(
                     app=self.main_app,
                     tournament_id=tournament.id()
                 ),
