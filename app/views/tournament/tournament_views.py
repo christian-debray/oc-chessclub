@@ -4,7 +4,7 @@ from app.helpers.string_formatters import format_cols, formatdate
 from app.helpers.text_ui import form_field, confirm, prompt_v
 import app.helpers.validation as validation
 from app.views.app_status_view import AppStatusView
-from datetime import date, datetime
+from datetime import date
 
 
 class TournamentMetaView(AbstractView):

@@ -286,8 +286,7 @@ class Tournament:
             return False
 
     def player_is_registered(self, player_id: str) -> bool:
-        """Checks if a player is already registered in this tournament.
-        """
+        """Checks if a player is already registered in this tournament."""
         return player_id in self._player_opponents
 
     def set_turns(self, turn_count: int = 4) -> bool:
@@ -373,10 +372,26 @@ class Tournament:
         else:
             return [(p, 1, 0.0) for p in self.participants]
 
-    def start_next_turn(self, player_pairs: list[tuple[Player, Player]] = None) -> Turn:
-        """Starts next Turn.
+    def can_start(self) -> bool:
+        """Return True if calling the start_next_turn is valid."""
+        if self.current_turn_idx == len(self.turns) - 1:
+            # Tournament reached the last turn
+            return False
+        if (self.current_turn_idx or 0) > 0 and not self.turns[
+            self.current_turn_idx
+        ].has_ended():
+            # Current turn has not ended
+            return False
+        if self.has_ended():
+            # Tournament has ended.
+            return False
+        if len(self.participants) % 2 > 0:
+            # Even participant number required.
+            return False
+        return True
 
-        Fails if the current Turn is still open or if the last turn
+    def start_next_turn(self, player_pairs: list[tuple[Player, Player]] = None) -> Turn:
+        """Fails if the current Turn is still open or if the last turn
         has started or ended.
         """
         if self.current_turn_idx == len(self.turns) - 1:

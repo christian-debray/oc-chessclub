@@ -335,7 +335,7 @@ if __name__ == "__main__":
     chessApp = MainController()
     script = None
     script = [
-        'TournamentManager.load_tournament({"tournament_id": "f1fe09f1-62c1-4f8a-87ff-3d12423a8baa"})',
+        'TournamentManager.load_tournament({"tournament_id": "tournament_test"})',
         'RunningTournamentManager.default()'
     ]
     chessApp.main(cmd_script=script)
