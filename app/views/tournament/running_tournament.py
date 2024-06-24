@@ -235,3 +235,30 @@ class EndMatchForm(BaseView):
                 winner = None
             self.confirm_cmd.set_command_params(match_idx=match_idx, end_time=end_time, winner_id=winner)
             self.issuecmd(self.confirm_cmd)
+
+
+class RankingView(BaseView):
+    """Display player scores
+
+    rank_info is a list of tuples holdig the score and rank info for each player.
+    This display assumes the list has already been sorted.
+    """
+    def __init__(self, cmd_manager: CommandManagerInterface,
+                 rank_data: list[tuple[int, dict[str, str], float]],
+                 title: str,
+                 text: str = None,
+                 clear_scr: bool = False):
+        super().__init__(cmd_manager=cmd_manager,
+                         title=title,
+                         text=text,
+                         clear_scr=clear_scr)
+        self.rank_data = rank_data
+
+    def render(self):
+        super().render()
+        table_data = [["Rank", "Participant", "Score"]]
+        for player_rank, player, player_score in self.rank_data:
+            player_tpl = f"{player.get("surname").upper()} {player.get("name").capitalize()}\n"
+            player_tpl += f"{player.get("national_player_id")}"
+            table_data.append([str(player_rank), player_tpl, str(player_score)])
+        print(format_table(table_data))

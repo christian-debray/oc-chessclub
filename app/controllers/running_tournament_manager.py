@@ -11,8 +11,10 @@ from app.views.tournament.running_tournament import (
     RoundView,
     SelectMatchForm,
     StartMatchForm,
-    EndMatchForm
+    EndMatchForm,
+    RankingView
 )
+from app.helpers.string_formatters import formatdate
 import logging
 
 logger = logging.getLogger()
@@ -29,11 +31,12 @@ class StartNextRoundCommand(commands.LaunchManagerCommand):
 
 
 class ListMatchesCommand(commands.LaunchManagerCommand):
-    def __init__(self, app: commands.CommandManagerInterface, **kwargs) -> None:
+    def __init__(self, app: commands.CommandManagerInterface, round_idx: int = None, **kwargs) -> None:
         super().__init__(
             app=app,
             cls_or_obj=RunningTournamentManager,
             method=RunningTournamentManager.list_matches,
+            round_idx=round_idx,
             **kwargs,
         )
 
@@ -100,6 +103,19 @@ class EndMatchCommand(commands.LaunchManagerCommand):
         )
 
 
+class DisplayRankingList(commands.LaunchManagerCommand):
+    def __init__(self, app: commands.CommandManagerInterface,
+                 title: str = None,
+                 text: str = None,
+                 tournament_id: str = None) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=RunningTournamentManager,
+                         method=RunningTournamentManager.display_rankinglist,
+                         title=title,
+                         text=text,
+                         tournament_id=tournament_id)
+
+
 class RunningTournamentManager(tournament_manager.TournamentManagerBase):
     """Manage turns and matches of a running tournament."""
 
@@ -142,6 +158,14 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                     command=tournament_manager.ListRegisteredPlayersCommand(
                         app=self.main_app, tournament_id=current_tournament.id()
                     ),
+                )
+            )
+            menu.add_option(
+                MenuOption(
+                    option_text="Player scores and ranks",
+                    command=DisplayRankingList(
+                        app=self.main_app,
+                        tournament_id=current_tournament.id())
                 )
             )
             if current_tournament.can_start() and current_tournament.status == "open":
@@ -230,7 +254,9 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
             logger.error(e)
             self.status.notify_failure(f"Couldn't start next round: {e}")
 
-    def list_matches(self, round_idx: int = None, tournament_id: str = None):
+    def list_matches(self,
+                     round_idx: int = None,
+                     tournament_id: str = None):
         try:
             tournament = (
                 self._curr_tournament()
@@ -343,6 +369,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         logger.debug(f"Ending match {match_idx}")
         try:
             match_idx = int(match_idx)
+            round = tournament.current_turn()
             if results := tournament.end_a_match(
                 match_index=match_idx, winner_id=winner_id, end_time=end_time
             ):
@@ -351,6 +378,17 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                     success_str += f"\n {results[0][0]}: {results[0][1]}"
                     success_str += f"\n {results[1][0]}: {results[1][1]}"
                     self.status.notify_success(success_str)
+                    if round.has_ended():
+                        title = "Final Ranks and Scores" if tournament.has_ended() else "Current Ranks and Scores"
+                        text = f"Completed: {round.name}"
+                        if not tournament.has_ended():
+                            remaining_rounds = tournament.metadata.turn_count - tournament.current_turn_idx - 1
+                            text += f" ({remaining_rounds} round{"s" if remaining_rounds > 1 else ""} to go)"
+                        self.main_app.receive(DisplayRankingList(app=self.main_app,
+                                                                 title=title,
+                                                                 text=text,
+                                                                 tournament_id=tournament.id()))
+                        return
                 else:
                     raise Exception("Failed to start match for an unexpected reason.")
         except Exception as e:
@@ -450,3 +488,29 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                     failure_cmd=failure_cmd,
                 )
             )
+
+    def display_rankinglist(self, title: str = None, text: str = None, tournament_id: str = None):
+        """Displays the scores and ranks of all participants
+        in a tournament.
+        """
+        tournament = self._get_tournament(tournament_id or self._curr_tournament_id())
+        if not tournament:
+            return
+        if not title:
+            tournament_date = formatdate(d=tournament.start_date(), fmt="%d/%m/%Y")
+            title = f"Tournament at {tournament.metadata.location}, {tournament_date}"
+            title += " - Scores and Ranks"
+        text = text or tournament.metadata.description
+        ranking_data = []
+        for player in tournament.participants:
+            ranking_data.append((
+                    tournament.player_rank(player.id()),
+                    player.asdict(),
+                    tournament.player_score(player.id())
+                ))
+        ranking_data.sort(key=lambda x: x[0])
+        v = RankingView(cmd_manager=self.main_app,
+                        rank_data=ranking_data,
+                        title=title,
+                        text=text)
+        self.main_app.view(v)
