@@ -12,7 +12,8 @@ from app.views.tournament.running_tournament import (
     SelectMatchForm,
     StartMatchForm,
     EndMatchForm,
-    RankingView
+    RankingView,
+    SelectRoundForm
 )
 from app.helpers.string_formatters import formatdate
 import logging
@@ -103,7 +104,7 @@ class EndMatchCommand(commands.LaunchManagerCommand):
         )
 
 
-class DisplayRankingList(commands.LaunchManagerCommand):
+class DisplayRankingListCommand(commands.LaunchManagerCommand):
     def __init__(self, app: commands.CommandManagerInterface,
                  title: str = None,
                  text: str = None,
@@ -113,6 +114,17 @@ class DisplayRankingList(commands.LaunchManagerCommand):
                          method=RunningTournamentManager.display_rankinglist,
                          title=title,
                          text=text,
+                         tournament_id=tournament_id)
+
+
+class ViewRoundInfoCommand(commands.LaunchManagerCommand):
+    def __init__(self, app: commands.CommandManagerInterface,
+                 round_idx: int,
+                 tournament_id: str = None) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=RunningTournamentManager,
+                         method=RunningTournamentManager.view_round_info,
+                         round_idx=round_idx,
                          tournament_id=tournament_id)
 
 
@@ -163,11 +175,18 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
             menu.add_option(
                 MenuOption(
                     option_text="Player scores and ranks",
-                    command=DisplayRankingList(
+                    command=DisplayRankingListCommand(
                         app=self.main_app,
                         tournament_id=current_tournament.id())
                 )
             )
+            menu.add_option(
+                MenuOption(
+                    option_text="Round details",
+                    command=ViewRoundInfoCommand(app=self.main_app,
+                                                 round_idx=None,
+                                                 tournament_id=current_tournament.id()))
+                )
             if current_tournament.can_start() and current_tournament.status == "open":
                 menu.add_option(
                     MenuOption(
@@ -384,10 +403,10 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                         if not tournament.has_ended():
                             remaining_rounds = tournament.metadata.turn_count - tournament.current_turn_idx - 1
                             text += f" ({remaining_rounds} round{"s" if remaining_rounds > 1 else ""} to go)"
-                        self.main_app.receive(DisplayRankingList(app=self.main_app,
-                                                                 title=title,
-                                                                 text=text,
-                                                                 tournament_id=tournament.id()))
+                        self.main_app.receive(DisplayRankingListCommand(app=self.main_app,
+                                                                        title=title,
+                                                                        text=text,
+                                                                        tournament_id=tournament.id()))
                         return
                 else:
                     raise Exception("Failed to start match for an unexpected reason.")
@@ -513,4 +532,31 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                         rank_data=ranking_data,
                         title=title,
                         text=text)
+        self.main_app.view(v)
+
+    def view_round_info(self, round_idx: int = None, tournament_id: str = None):
+        """Display match details of a round
+        """
+        tournament = self._get_tournament(tournament_id or self._curr_tournament_id())
+        if not tournament:
+            return
+        if round_idx is None:
+            # round_idx is required, prompt the user
+            round_map = {}
+            for idx in range(tournament.metadata.turn_count):
+                if round := tournament.turns[idx]:
+                    round_map[idx] = tournament.turns[idx].name
+                    if idx == tournament.current_turn_idx:
+                        round_map[idx] += "*"
+            v = SelectRoundForm(cmd_manager=self.main_app,
+                                round_map=round_map,
+                                text="Select a round index to display all match details.",
+                                confirm_cmd=ViewRoundInfoCommand(app=self.main_app,
+                                                                 round_idx=None,
+                                                                 tournament_id=tournament.id()))
+            self.main_app.view(v)
+            return
+        round = tournament.turns[round_idx]
+        v = RoundView(cmd_manager=self.main_app,
+                      round_data=self._tournament_round_data(round))
         self.main_app.view(v)

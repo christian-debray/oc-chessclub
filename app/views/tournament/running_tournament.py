@@ -72,6 +72,38 @@ class RoundView(BaseView):
         return table
 
 
+class SelectRoundForm(BaseView):
+    """Prompts the user for a round index.
+    """
+    def __init__(self,
+                 cmd_manager: CommandInterface,
+                 round_map: dict[int, str],
+                 title: str = None,
+                 text: str = None,
+                 confirm_cmd: CommandInterface = None,
+                 abandon_cmd: CommandInterface = None):
+        super().__init__(cmd_manager=cmd_manager,
+                         title=title,
+                         text=text)
+        self.round_map: dict[int, str] = round_map
+        self.confirm_cmd = confirm_cmd
+        self.abandon_cmd = abandon_cmd
+
+    def render(self):
+        super().render()
+        keys = [str(r_idx + 1) for r_idx in self.round_map.keys()]
+        for k, v in self.round_map.items():
+            print(f"{k+1}. {v}")
+        if choice := prompt_v(prompt="Enter a round index > ",
+                              validator=lambda x: (str(x)).isdecimal() and x in keys,
+                              skip_blank=True):
+            if self.confirm_cmd:
+                self.confirm_cmd.set_command_params(round_idx=int(choice) - 1)
+                self.issuecmd(self.confirm_cmd)
+        else:
+            self.issuecmd(self.abandon_cmd)
+
+
 class SelectMatchForm(BaseView):
     """Prompts the user for a match index.
     """
