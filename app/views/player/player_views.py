@@ -1,9 +1,9 @@
 from app.models.player_model import is_valid_national_player_id
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
-from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key, format_table
+from app.helpers.text_ui import prompt_v, confirm, clear, format_table
 import app.helpers.validation as validation
 from datetime import date
-from app.views.views_abc import AbstractView
+from app.views.views_abc import AbstractView, BaseView
 from app.views.app_status_view import AppStatusView
 import logging
 
@@ -28,16 +28,21 @@ class PlayerView(AbstractView):
         return cells if as_cells else " - ".join(cells)
 
 
-class PlayerListView:
+class PlayerListView(BaseView):
     """View a list of players
     """
-    def __init__(self, player_list: list[dict]):
+
+    def __init__(self,
+                 player_list: list[dict],
+                 title: str = None,
+                 text: str = None,
+                 clear_scr: bool = False):
+        super().__init__(title=title or "Players List", text=f"{len(player_list)} players")
         self.player_list = player_list
 
     def render(self):
-        print("*** Players List ***")
+        super().render()
         print(self.player_list_str(self.player_list))
-        proceed_any_key()
 
     @staticmethod
     def player_list_str(players: list[dict]) -> str:

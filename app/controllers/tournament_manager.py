@@ -613,7 +613,8 @@ Please check the tournament ID and files in the tournament data folder."
         tournament_id = tournament_id or self._curr_tournament_id()
         tournament = self._get_tournament(tournament_id=tournament_id)
         registered_players_datalist = [p.asdict() for p in tournament.participants]
-        v = PlayerListView(player_list=registered_players_datalist)
+        v = PlayerListView(player_list=registered_players_datalist,
+                           title=f"Registered Players - tournament in {tournament.metadata.location}")
         self.main_app.view(v)
 
     def list_available_players(self, tournament_id: str = None):
@@ -625,5 +626,6 @@ Please check the tournament ID and files in the tournament data folder."
             where=lambda pl: not tournament.player_is_registered(pl.id())
         )
         available_players_datalist = [p.asdict() for p in available_players]
-        v = PlayerListView(player_list=available_players_datalist)
+        v = PlayerListView(player_list=available_players_datalist,
+                           title="Players available for registration")
         self.main_app.view(v)
