@@ -135,5 +135,20 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
     def list_matches(self):
         tournament = self._curr_tournament()
         round = tournament.current_turn()
-        v = RoundView(cmd_manager=self.main_app, round_data=round.asdict())
+
+        matches_data = []
+        for m, m_details in enumerate(round.matches):
+            matches_data.append(
+                {
+                    "idx": m,
+                    "player1": m_details.player1().asdict(),
+                    "player2": m_details.player2().asdict(),
+                    "score_player1": m_details.player_score(m_details.player1().id()),
+                    "score_player2": m_details.player_score(m_details.player2().id()),
+                    "start_time": m_details.start_time,
+                    "end_time": m_details.end_time,
+                }
+            )
+        round_data = {"name": round.name, "matches": matches_data}
+        v = RoundView(cmd_manager=self.main_app, round_data=round_data)
         self.main_app.view(v)

@@ -2,7 +2,7 @@ from app.commands.commands_abc import CommandManagerInterface
 from app.views.menu import Menu, MenuOption
 from app.views.tournament.tournament_views import TournamentDetailsView
 from app.views.views_abc import BaseView
-from app.helpers.string_formatters import format_cols, formatdate
+from app.helpers.string_formatters import format_table, formatdate
 
 
 class RunningTournamentMenu(Menu):
@@ -38,27 +38,25 @@ class RoundView(BaseView):
     def render(self):
         super().render()
         match_list: list[dict] = self.round_data.get("matches", [])
-        rows = []
+        rows = [["idx", "player 1", "player 2", "status", "started", "ended"]]
         for m_idx, m_data in enumerate(match_list):
-            players = m_data.get("players")
-            player1, score1 = players[0]
-            player2, score2 = players[1]
-
+            player1: dict[str, str] = m_data.get("player1")
+            player2: dict[str, str] = m_data.get("player2")
+            player1_str = f"{player1.get("surname").upper()} {player1.get("name").capitalize()}"
+            player2_str = f"{player2.get("surname").upper()} {player2.get("name").capitalize()}"
             rows.append(
                 [
                     f"{(m_idx+1):>3}",
+                    f"{player1_str}\n{player1.get("national_player_id")}\n{m_data.get("score_player1")}",
+                    f"{player2_str}\n{player2.get("national_player_id")}\n{m_data.get("score_player2")}",
                     (
                         "pending"
                         if m_data.get("start_time") is None
                         else ("running" if m_data.get("end_time") is None else "ended")
                     ),
-                    f"{player1} ({score1})",
-                    f"{player2} ({score2})",
                     formatdate(m_data.get("start_time"), "%d/%m/%Y %H:%M:%S", "-"),
                     formatdate(m_data.get("end_time"), "%d/%m/%Y %H:%M:%S", "-"),
                 ]
             )
-        table = format_cols(
-            rows, ["idx", "status", "player1", "player2", "started", "ended"]
-        )
+        table = format_table(rows)
         print(table)
