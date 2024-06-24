@@ -234,6 +234,15 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                             )
                         )
                     )
+            menu.add_option(
+                MenuOption(
+                    option_text="Edit tournament info",
+                    command=tournament_manager.EditTournamentInfoCommand(
+                        app=self.main_app,
+                        tournament_id=current_tournament.id()
+                    )
+                )
+            )
         menu.add_option(
             MenuOption(
                 option_text="Return to previous menu",
