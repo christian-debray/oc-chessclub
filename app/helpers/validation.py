@@ -2,7 +2,8 @@
 """
 
 import re
-from datetime import date
+from datetime import date, datetime
+import time
 
 
 def is_valid_name(val: str):
@@ -32,6 +33,26 @@ def is_valid_date(val: str) -> bool:
     """
     try:
         date.fromisoformat(val)
+        return True
+    except ValueError:
+        return False
+
+
+def is_valid_time(val: str) -> bool:
+    """Returns True if argument is a valid time string
+    (HH:MM:SS)"""
+    try:
+        time.strptime(val, "%H:%M:%S")
+        return True
+    except ValueError:
+        return False
+
+
+def is_valid_datetime(val: str) -> bool:
+    """Returns True if string is a valid datetime in ISO Format
+    """
+    try:
+        datetime.fromisoformat(val)
         return True
     except ValueError:
         return False

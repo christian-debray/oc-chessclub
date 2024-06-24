@@ -431,6 +431,46 @@ class Tournament:
             return None
         return self.turns[self.current_turn_idx]
 
+    def pending_matches(self) -> list[tuple[int, Match]]:
+        """Returns a list of pending matches and their index in the current round.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            return [(m, match) for m, match in enumerate(current_turn.matches) if not match.has_started()]
+        else:
+            return None
+
+    def has_pending_matches(self) -> bool:
+        """Returns True if matches are still waiting to be started
+        in this tournament's current round.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return False
+            if current_turn.has_ended():
+                return False
+            for m in current_turn.matches:
+                if not m.has_started():
+                    return True
+        return False
+
+    def start_a_match(self, match_index: int, start_time: datetime = None) -> Match:
+        """Starts a match in the current Round.
+        Returns the started match if succesful, None otherwise.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            current_turn.matches[match_index].start(start_time=start_time)
+            return current_turn.matches[match_index]
+        else:
+            return None
+
     def update_score_board(self) -> list[tuple[Player, int, float]]:
         """Maintain a scores board and score ranks."""
         score_board: dict[float, list[Player]] = {}
