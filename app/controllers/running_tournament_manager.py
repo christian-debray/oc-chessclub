@@ -3,7 +3,7 @@ from app.commands import commands
 from app.commands.commands_abc import CommandInterface
 from app.controllers.controller_abc import MainController
 from app.models.player_model import PlayerRepository
-from app.models.tournament_model import TournamentRepository, Turn, Match
+from app.models.tournament_model import TournamentRepository, Round, Match
 from app.controllers import tournament_manager
 from app.views.menu import Menu, MenuOption
 from app.views.tournament.running_tournament import (
@@ -323,7 +323,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
             }
         return matches_data
 
-    def _tournament_round_data(self, round: Turn) -> dict:
+    def _tournament_round_data(self, round: Round) -> dict:
         """Returns a dict containing a round's data"""
         round_data = {
             "name": round.name,
