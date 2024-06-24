@@ -222,10 +222,13 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
 
     def start_next_round(self):
         tournament = self._curr_tournament()
-        if new_turn := tournament.start_next_turn():
+        try:
+            new_turn = tournament.start_next_turn()
+            self.tournament_repo.store_tournament(tournament)
             self.status.notify_success(f"Round {new_turn} has started !")
-        else:
-            self.status.notify_failure("Couldn't start next round !")
+        except Exception as e:
+            logger.error(e)
+            self.status.notify_failure(f"Couldn't start next round: {e}")
 
     def list_matches(self, round_idx: int = None, tournament_id: str = None):
         try:
