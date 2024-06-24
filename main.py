@@ -142,6 +142,8 @@ class MainController(MainController):
         All other commands are executed in stack order.
         """
         for cmd in command:
+            if not cmd:
+                continue
             logger.debug(f"Received command {cmd.__class__}")
             if cmd.cycle:
                 logger.debug(
@@ -192,20 +194,23 @@ class MainController(MainController):
                 ),
             )
         )
+        menu_view.add_option(
+            MenuOption(
+                option_text="Set Current Tournament",
+                command=tournament_manager.LoadTournamentCommand(
+                    app=self,
+                    confirm_cmd=commands.LaunchManagerCommand(
+                        app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
+                    ))
+            )
+        )
         if self.get_state('current_tournament_id'):
             menu_view.add_option(
                 MenuOption(
-                    option_text="Current Tournament",
+                    option_text="Run Current Tournament",
                     command=commands.LaunchManagerCommand(
                         app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
                     )
-                )
-            )
-        else:
-            menu_view.add_option(
-                MenuOption(
-                    option_text="Set current tournament",
-                    command=tournament_manager.LoadTournamentCommand(app=self)
                 )
             )
         menu_view.add_option(

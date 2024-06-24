@@ -31,8 +31,8 @@ class BaseView(AbstractView):
 
     def __init__(
         self,
-        cmd_manager: CommandManagerInterface,
-        title: str,
+        cmd_manager: CommandManagerInterface = None,
+        title: str = None,
         text: str = None,
         clear_scr: bool = False,
     ):

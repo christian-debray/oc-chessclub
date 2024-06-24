@@ -1,9 +1,9 @@
 from app.models.player_model import is_valid_national_player_id
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
-from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key, format_table
+from app.helpers.text_ui import prompt_v, confirm, clear, format_table
 import app.helpers.validation as validation
 from datetime import date
-from app.views.views_abc import AbstractView
+from app.views.views_abc import AbstractView, BaseView
 from app.views.app_status_view import AppStatusView
 import logging
 
@@ -28,16 +28,21 @@ class PlayerView(AbstractView):
         return cells if as_cells else " - ".join(cells)
 
 
-class PlayerListView:
+class PlayerListView(BaseView):
     """View a list of players
     """
-    def __init__(self, player_list: list[dict]):
+
+    def __init__(self,
+                 player_list: list[dict],
+                 title: str = None,
+                 text: str = None,
+                 clear_scr: bool = False):
+        super().__init__(title=title or "Players List", text=f"{len(player_list)} players")
         self.player_list = player_list
 
     def render(self):
-        print("*** Players List ***")
+        super().render()
         print(self.player_list_str(self.player_list))
-        proceed_any_key()
 
     @staticmethod
     def player_list_str(players: list[dict]) -> str:
@@ -146,25 +151,57 @@ class PlayerIDPrompt(AbstractView):
         self,
         cmd_mgr: CommandManagerInterface,
         prompt: str = None,
-        cancelCommand: CommandInterface = None,
-        confirmCommand: CommandInterface = None,
+        cancel_cmd: CommandInterface = None,
+        confirm_cmd: CommandInterface = None,
+        list_cmd: CommandInterface = None
     ):
         super().__init__(cmd_manager=cmd_mgr)
         self.prompt = prompt
-        self.cancelcommand: CommandInterface = cancelCommand
-        self.confirmcommand: CommandInterface = confirmCommand
+        self.cancel_cmd: CommandInterface = cancel_cmd
+        self.confirm_cmd: CommandInterface = confirm_cmd
+        self.list_cmd: CommandInterface = list_cmd
+        self.list_key: str = "L"
 
     def render(self):
-        val = self.getinput(self.prompt)
-        if val is not None and self.confirmcommand:
-            self.confirmcommand.set_command_params(player_id=val)
-            self.issuecmd(self.confirmcommand)
-        elif self.cancelcommand:
-            self.issuecmd(self.cancelcommand)
+        self.prompt += "\n<Ctrl> + 'D' to abandon"
+        if self.list_cmd:
+            shortcuts = {self.list_key: self.list_key}
+            self.prompt += f"\n'{self.list_key}' + <Enter> to list players"
+        else:
+            shortcuts = {}
+        self.prompt += "\nPlayer ID > "
+        val = self.getinput(prompt=self.prompt, shortcuts=shortcuts)
+        if val is not None:
+            if val == self.list_key:
+                self.issuecmd(self.list_cmd)
+            elif self.confirm_cmd:
+                self.confirm_cmd.set_command_params(player_id=val)
+                self.issuecmd(self.confirm_cmd)
+        elif self.cancel_cmd:
+            self.issuecmd(self.cancel_cmd)
+        self.prompt += "\n<Ctrl> + 'D' to abandon"
+        if self.list_cmd:
+            shortcuts = {self.list_key: self.list_key}
+            self.prompt += f"\n'{self.list_key}' + <Enter> to list players"
+        else:
+            shortcuts = {}
+        self.prompt += "\nPlayer ID > "
+        val = self.getinput(prompt=self.prompt, shortcuts=shortcuts)
+        if val is not None:
+            if val == self.list_key:
+                self.issuecmd(self.list_cmd)
+            elif self.confirm_cmd:
+                self.confirm_cmd.set_command_params(player_id=val)
+                self.issuecmd(self.confirm_cmd)
+        elif self.cancel_cmd:
+            self.issuecmd(self.cancel_cmd)
 
     @staticmethod
     def getinput(prompt, shortcuts: dict[str, str] = None):
-
+        """Prompts for a Player ID and returns the value entered by the user.
+        """
+        """Prompts for a Player ID and returns the value entered by the user.
+        """
         return prompt_v(
             prompt=f"{prompt}",
             validator=is_valid_national_player_id,

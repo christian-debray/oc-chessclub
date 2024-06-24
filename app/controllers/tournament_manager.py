@@ -33,13 +33,18 @@ class NewTournamentCommand(commands.LaunchManagerCommand):
 
 class LoadTournamentCommand(commands.LaunchManagerCommand):
     def __init__(
-        self, app: commands.CommandManagerInterface, tournament_id: str = None
+        self,
+        app: commands.CommandManagerInterface,
+        tournament_id: str = None,
+        confirm_cmd: commands.CommandInterface = None
+
     ) -> None:
         super().__init__(
             app=app,
             cls_or_obj=TournamentManager,
             method=TournamentManager.load_tournament,
             tournament_id=tournament_id,
+            confirm_cmd=confirm_cmd
         )
 
 
@@ -306,7 +311,7 @@ class TournamentManager(TournamentManagerBase):
         )
         self.main_app.view(menu)
 
-    def load_tournament(self, tournament_id: str = None):
+    def load_tournament(self, tournament_id: str = None, confirm_cmd: commands.CommandInterface = None):
         """Load a tournament in memory and sets as current tournament
         for other operations.
         """
@@ -314,9 +319,9 @@ class TournamentManager(TournamentManagerBase):
             # Come back with a tournament ID...
             v = tournament_views.SelectTournamentIDView(
                 cmd_manager=self.main_app,
-                confirm_command=LoadTournamentCommand(app=self.main_app),
+                confirm_command=LoadTournamentCommand(app=self.main_app, confirm_cmd=confirm_cmd),
                 list_command=[
-                    LoadTournamentCommand(app=self.main_app),
+                    LoadTournamentCommand(app=self.main_app, confirm_cmd=confirm_cmd),
                     ListTournamentsCommand(app=self.main_app)
                     ]
             )
@@ -334,6 +339,7 @@ class TournamentManager(TournamentManagerBase):
                 self.main_app.set_state("current_tournament_id", tournament_id)
                 tournament_meta_str = self._tournament_meta_str(tournament.metadata)
                 self.status.notify_success(f"Tournament loaded: {tournament_meta_str}")
+                self.main_app.receive(confirm_cmd)
             except Exception as e:
                 logger.error(e, stack_info=True)
                 self.status.notify_failure(
@@ -613,7 +619,8 @@ Please check the tournament ID and files in the tournament data folder."
         tournament_id = tournament_id or self._curr_tournament_id()
         tournament = self._get_tournament(tournament_id=tournament_id)
         registered_players_datalist = [p.asdict() for p in tournament.participants]
-        v = PlayerListView(player_list=registered_players_datalist)
+        v = PlayerListView(player_list=registered_players_datalist,
+                           title=f"Registered Players - tournament in {tournament.metadata.location}")
         self.main_app.view(v)
 
     def list_available_players(self, tournament_id: str = None):
@@ -625,5 +632,6 @@ Please check the tournament ID and files in the tournament data folder."
             where=lambda pl: not tournament.player_is_registered(pl.id())
         )
         available_players_datalist = [p.asdict() for p in available_players]
-        v = PlayerListView(player_list=available_players_datalist)
+        v = PlayerListView(player_list=available_players_datalist,
+                           title="Players available for registration")
         self.main_app.view(v)

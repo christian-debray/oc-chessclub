@@ -113,9 +113,11 @@ class PlayerManager(BaseController):
             # Try again with a player ID...
             prompt_view = PlayerIDPrompt(
                 cmd_mgr=self.main_app,
-                prompt="Please enter the ID of the player to edit > ",
-                cancelCommand=None,
-                confirmCommand=EditPlayerCommand(app=self.main_app),
+                prompt="Please enter the ID of the player to edit",
+                confirm_cmd=EditPlayerCommand(app=self.main_app),
+                list_cmd=[
+                    EditPlayerCommand(app=self.main_app),
+                    ListAllPlayersCommand(app=self.main_app)]
             )
             self.main_app.view(prompt_view)
             return
