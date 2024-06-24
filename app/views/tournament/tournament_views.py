@@ -1,7 +1,7 @@
 from app.commands import commands_abc
 from app.views.views_abc import BaseView, AbstractView
-from app.helpers.string_formatters import format_cols, formatdate
-from app.helpers.text_ui import form_field, confirm, prompt_v
+from app.helpers.string_formatters import formatdate
+from app.helpers.text_ui import form_field, confirm, prompt_v, format_table
 import app.helpers.validation as validation
 from app.views.app_status_view import AppStatusView
 from datetime import date
@@ -62,10 +62,8 @@ class TournamentsListView(BaseView):
             TournamentMetaView.tournament_meta_template(data=t, as_cells=True)
             for t in tournament_list
         ]
-        return format_cols(
-            data=lines,
-            headers=["Tournament_id", "location", "status", "start date", "end date"],
-        )
+        headers = ["Tournament_id", "location", "status", "start date", "end date"]
+        return format_table(table_data=[headers] + lines)
 
 
 class SelectTournamentIDView(AbstractView):

@@ -1,7 +1,6 @@
 from app.models.player_model import is_valid_national_player_id
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
-from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key
-from app.helpers.string_formatters import format_cols
+from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key, format_table
 import app.helpers.validation as validation
 from datetime import date
 from app.views.views_abc import AbstractView
@@ -43,7 +42,7 @@ class PlayerListView:
     @staticmethod
     def player_list_str(players: list[dict]) -> str:
         p_lines = [PlayerView.player_template(p, as_cells=True) for p in players]
-        return format_cols(p_lines, ["Player ID", "Name", "Birthdate"])
+        return format_table([["Player ID", "Name", "Birthdate"]] + p_lines)
 
 
 class PlayerEditor(AbstractView):

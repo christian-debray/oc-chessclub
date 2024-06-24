@@ -3,8 +3,8 @@ from app.commands.commands_abc import CommandManagerInterface, CommandInterface
 from app.views.menu import Menu, MenuOption
 from app.views.tournament.tournament_views import TournamentDetailsView
 from app.views.views_abc import BaseView
-from app.helpers.string_formatters import format_table, formatdate
-from app.helpers.text_ui import prompt_v
+from app.helpers.string_formatters import formatdate
+from app.helpers.text_ui import prompt_v, format_table
 from app.helpers.validation import is_valid_datetime, is_valid_time
 import logging
 
