@@ -10,7 +10,8 @@ from app.views.tournament.running_tournament import (
     RunningTournamentMenu,
     RoundView,
     SelectMatchForm,
-    StartMatchForm
+    StartMatchForm,
+    EndMatchForm
 )
 import logging
 
@@ -75,6 +76,26 @@ class StartMatchCommand(commands.LaunchManagerCommand):
             method=RunningTournamentManager.start_match,
             match_idx=match_idx,
             start_time=start_time,
+            tournament_id=tournament_id,
+        )
+
+
+class EndMatchCommand(commands.LaunchManagerCommand):
+    def __init__(
+        self,
+        app: commands.CommandManagerInterface,
+        match_idx: int = None,
+        winner_id: str = None,
+        end_time: datetime = None,
+        tournament_id: str = None,
+    ) -> None:
+        super().__init__(
+            app,
+            cls_or_obj=RunningTournamentManager,
+            method=RunningTournamentManager.end_match,
+            match_idx=match_idx,
+            end_time=end_time,
+            winner_id=winner_id,
             tournament_id=tournament_id,
         )
 
@@ -156,6 +177,19 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                             ),
                         )
                     )
+                if current_tournament.has_running_matches():
+                    menu.add_option(
+                        MenuOption(
+                            option_text="End a match",
+                            command=EndMatchCommand(
+                                app=self.main_app,
+                                match_idx=None,
+                                end_time=None,
+                                winner_id=None,
+                                tournament_id=current_tournament.id()
+                            )
+                        )
+                    )
         menu.add_option(
             MenuOption(
                 option_text="Return to previous menu",
@@ -220,22 +254,23 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         indexed by the matches index."""
         matches_data = {}
         for m, m_details in match_list:
-            matches_data[m] = (
-                {
-                    "idx": m,
-                    "player1": m_details.player1().asdict(),
-                    "player2": m_details.player2().asdict(),
-                    "score_player1": m_details.player_score(m_details.player1().id()),
-                    "score_player2": m_details.player_score(m_details.player2().id()),
-                    "start_time": m_details.start_time,
-                    "end_time": m_details.end_time,
-                }
-            )
+            matches_data[m] = {
+                "idx": m,
+                "player1": m_details.player1().asdict(),
+                "player2": m_details.player2().asdict(),
+                "score_player1": m_details.player_score(m_details.player1().id()),
+                "score_player2": m_details.player_score(m_details.player2().id()),
+                "start_time": m_details.start_time,
+                "end_time": m_details.end_time,
+            }
         return matches_data
 
     def _tournament_round_data(self, round: Turn) -> dict:
         """Returns a dict containing a round's data"""
-        round_data = {"name": round.name, "matches": self._match_data(enumerate(round.matches))}
+        round_data = {
+            "name": round.name,
+            "matches": self._match_data(enumerate(round.matches)),
+        }
         return round_data
 
     def start_match(
@@ -256,20 +291,63 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                 cmd_manager=self.main_app,
                 pending_matches_data=self._match_data(tournament.pending_matches()),
                 confirm_cmd=StartMatchCommand(
-                    app=self.main_app,
-                    tournament_id=tournament.id()
-                )
+                    app=self.main_app, tournament_id=tournament.id()
+                ),
             )
             self.main_app.view(form)
             return
         logger.debug(f"Starting match {match_idx}")
         try:
             match_idx = int(match_idx)
-            if match := tournament.start_a_match(match_index=match_idx, start_time=start_time):
+            if match := tournament.start_a_match(
+                match_index=match_idx, start_time=start_time
+            ):
                 if self.tournament_repo.store_tournament(tournament):
                     self.status.notify_success(
                         f"Started match {match_idx+1}: {match.player1()} vs {match.player2()}"
                     )
+                else:
+                    raise Exception("Failed to start match for an unexpected reason.")
+        except Exception as e:
+            logger.error(e)
+            self.status.notify_failure(f"Can't start match {match_idx+1}: {e}")
+
+    def end_match(
+        self,
+        match_idx: int = None,
+        end_time: datetime = None,
+        winner_id: str = None,
+        tournament_id: str = None,
+    ):
+        """End a match in the current round"""
+        """Starts a pending match."""
+        tournament_id = tournament_id or self._curr_tournament_id()
+        tournament = self._get_tournament(tournament_id)
+        if not tournament:
+            logger.error(f"Tournament not found: id={tournament_id}")
+            return
+        if match_idx is None:
+            logger.debug("Match index is required, redirect to selectMatch")
+            form = EndMatchForm(
+                cmd_manager=self.main_app,
+                running_matches_data=self._match_data(tournament.running_matches()),
+                confirm_cmd=EndMatchCommand(
+                    app=self.main_app, tournament_id=tournament.id()
+                ),
+            )
+            self.main_app.view(form)
+            return
+        logger.debug(f"Ending match {match_idx}")
+        try:
+            match_idx = int(match_idx)
+            if results := tournament.end_a_match(
+                match_index=match_idx, winner_id=winner_id, end_time=end_time
+            ):
+                if self.tournament_repo.store_tournament(tournament):
+                    success_str = f"Ended match {match_idx+1}:\n"
+                    success_str += f"\n {results[0][0]}: {results[0][1]}"
+                    success_str += f"\n {results[1][0]}: {results[1][1]}"
+                    self.status.notify_success(success_str)
                 else:
                     raise Exception("Failed to start match for an unexpected reason.")
         except Exception as e:
@@ -283,7 +361,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         tournament_id: str = None,
         match_list: list[tuple[int, Match]] = None,
         success_cmd: CommandInterface = None,
-        failure_cmd: CommandInterface = None
+        failure_cmd: CommandInterface = None,
     ):
         """Selects a match in a round"""
         if not tournament_id:

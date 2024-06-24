@@ -432,14 +432,17 @@ class Tournament:
         return self.turns[self.current_turn_idx]
 
     def pending_matches(self) -> list[tuple[int, Match]]:
-        """Returns a list of pending matches and their index in the current round.
-        """
+        """Returns a list of pending matches and their index in the current round."""
         if current_turn := self.current_turn():
             if not current_turn.has_started():
                 return None
             if current_turn.has_ended():
                 return None
-            return [(m, match) for m, match in enumerate(current_turn.matches) if not match.has_started()]
+            return [
+                (m, match)
+                for m, match in enumerate(current_turn.matches)
+                if not match.has_started()
+            ]
         else:
             return None
 
@@ -468,6 +471,53 @@ class Tournament:
                 return None
             current_turn.matches[match_index].start(start_time=start_time)
             return current_turn.matches[match_index]
+        else:
+            return None
+
+    def running_matches(self) -> list[tuple[int, Match]]:
+        """Returns a list of pending matches and their index in the current round."""
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            return [
+                (m, match)
+                for m, match in enumerate(current_turn.matches)
+                if (match.has_started() and not match.has_ended())
+            ]
+        else:
+            return None
+
+    def has_running_matches(self) -> bool:
+        """Returns True if macthes are waiting to be ended in this tournament's curren round."""
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return False
+            if current_turn.has_ended():
+                return False
+            for match in current_turn.matches:
+                if match.has_started() and not match.has_ended():
+                    return True
+        else:
+            return False
+
+    def end_a_match(
+        self, match_index: int, winner_id: str, end_time: datetime = None
+    ) -> tuple[tuple[Player, float], tuple[Player, float]]:
+        """Ends a match in the current Round.
+        Returns the result, None otherwise.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            match = current_turn.matches[match_index]
+            result = match.end(winner=winner_id, end_time=end_time)
+            self.update_end_date()
+            self.update_score_board()
+            return result
         else:
             return None
 
