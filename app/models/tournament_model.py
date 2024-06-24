@@ -233,10 +233,6 @@ class Tournament:
         - turns:
         - current_turn:
         """
-        if participants is not None and len(participants) % 2 > 0:
-            raise ValueError(
-                "Tournament requires even number of participants; uneven list given."
-            )
         if turns is not None and len(turns) != metadata.turn_count:
             raise ValueError("Turn count mismatch.")
         self.metadata: TournamentMetaData = metadata
@@ -262,6 +258,10 @@ class Tournament:
 
         self.update_score_board()
         self.update_end_date()
+        if participants and self.has_started() and len(participants) % 2 > 0:
+            raise ValueError(
+                "Running or Ended Tournament require even number of participants; uneven list given."
+            )
 
     def id(self) -> str:
         return self.metadata.id()
@@ -281,6 +281,13 @@ class Tournament:
         if player not in self.participants:
             self.participants.append(player)
             self._player_opponents[player.id()] = []
+            return True
+        else:
+            return False
+
+    def player_is_registered(self, player_id: str) -> bool:
+        """Checks if a player is already registered in this tournament."""
+        return player_id in self._player_opponents
 
     def set_turns(self, turn_count: int = 4) -> bool:
         """Sets how many turns this torunament will last (the default is 4).
@@ -365,10 +372,26 @@ class Tournament:
         else:
             return [(p, 1, 0.0) for p in self.participants]
 
-    def start_next_turn(self, player_pairs: list[tuple[Player, Player]] = None) -> Turn:
-        """Starts next Turn.
+    def can_start(self) -> bool:
+        """Return True if calling the start_next_turn is valid."""
+        if self.current_turn_idx == len(self.turns) - 1:
+            # Tournament reached the last turn
+            return False
+        if (self.current_turn_idx or 0) > 0 and not self.turns[
+            self.current_turn_idx
+        ].has_ended():
+            # Current turn has not ended
+            return False
+        if self.has_ended():
+            # Tournament has ended.
+            return False
+        if len(self.participants) % 2 > 0:
+            # Even participant number required.
+            return False
+        return True
 
-        Fails if the current Turn is still open or if the last turn
+    def start_next_turn(self, player_pairs: list[tuple[Player, Player]] = None) -> Turn:
+        """Fails if the current Turn is still open or if the last turn
         has started or ended.
         """
         if self.current_turn_idx == len(self.turns) - 1:
@@ -407,6 +430,96 @@ class Tournament:
         if self.has_ended() or not self.has_started():
             return None
         return self.turns[self.current_turn_idx]
+
+    def pending_matches(self) -> list[tuple[int, Match]]:
+        """Returns a list of pending matches and their index in the current round."""
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            return [
+                (m, match)
+                for m, match in enumerate(current_turn.matches)
+                if not match.has_started()
+            ]
+        else:
+            return None
+
+    def has_pending_matches(self) -> bool:
+        """Returns True if matches are still waiting to be started
+        in this tournament's current round.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return False
+            if current_turn.has_ended():
+                return False
+            for m in current_turn.matches:
+                if not m.has_started():
+                    return True
+        return False
+
+    def start_a_match(self, match_index: int, start_time: datetime = None) -> Match:
+        """Starts a match in the current Round.
+        Returns the started match if succesful, None otherwise.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            current_turn.matches[match_index].start(start_time=start_time)
+            return current_turn.matches[match_index]
+        else:
+            return None
+
+    def running_matches(self) -> list[tuple[int, Match]]:
+        """Returns a list of pending matches and their index in the current round."""
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            return [
+                (m, match)
+                for m, match in enumerate(current_turn.matches)
+                if (match.has_started() and not match.has_ended())
+            ]
+        else:
+            return None
+
+    def has_running_matches(self) -> bool:
+        """Returns True if macthes are waiting to be ended in this tournament's curren round."""
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return False
+            if current_turn.has_ended():
+                return False
+            for match in current_turn.matches:
+                if match.has_started() and not match.has_ended():
+                    return True
+        else:
+            return False
+
+    def end_a_match(
+        self, match_index: int, winner_id: str, end_time: datetime = None
+    ) -> tuple[tuple[Player, float], tuple[Player, float]]:
+        """Ends a match in the current Round.
+        Returns the result, None otherwise.
+        """
+        if current_turn := self.current_turn():
+            if not current_turn.has_started():
+                return None
+            if current_turn.has_ended():
+                return None
+            match = current_turn.matches[match_index]
+            result = match.end(winner=winner_id, end_time=end_time)
+            self.update_end_date()
+            self.update_score_board()
+            return result
+        else:
+            return None
 
     def update_score_board(self) -> list[tuple[Player, int, float]]:
         """Maintain a scores board and score ranks."""
@@ -766,7 +879,7 @@ class TournamentRepository:
                     raise KeyError("Duplicate Player ID in participants data")
                 player_list[player_id_str] = pl
             else:
-                raise KeyError("Player ID not found in repository")
+                raise KeyError(f"Player ID not found in repository: '{player_id_str}'")
         return player_list
 
 

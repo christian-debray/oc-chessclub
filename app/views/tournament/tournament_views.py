@@ -1,9 +1,10 @@
 from app.commands import commands_abc
 from app.views.views_abc import BaseView, AbstractView
-from app.helpers.string_formatters import format_cols, formatdate
-from app.helpers.text_ui import form_field, confirm, prompt_v
+from app.helpers.string_formatters import formatdate
+from app.helpers.text_ui import form_field, confirm, prompt_v, format_table
 import app.helpers.validation as validation
 from app.views.app_status_view import AppStatusView
+from datetime import date
 
 
 class TournamentMetaView(AbstractView):
@@ -61,10 +62,8 @@ class TournamentsListView(BaseView):
             TournamentMetaView.tournament_meta_template(data=t, as_cells=True)
             for t in tournament_list
         ]
-        return format_cols(
-            data=lines,
-            headers=["Tournament_id", "location", "status", "start date", "end date"],
-        )
+        headers = ["Tournament_id", "location", "status", "start date", "end date"]
+        return format_table(table_data=[headers] + lines)
 
 
 class SelectTournamentIDView(AbstractView):
@@ -75,28 +74,45 @@ class SelectTournamentIDView(AbstractView):
         cmd_manager: commands_abc.CommandManagerInterface,
         confirm_command: commands_abc.CommandInterface = None,
         cancel_command: commands_abc.CommandInterface = None,
+        list_command: commands_abc.CommandInterface = None
     ):
         super().__init__(cmd_manager)
         self.confirm_command = confirm_command
         self.cancel_command = cancel_command
+        self.list_command = list_command
+        self.list_key = "L"
 
     def render(self):
-        if tournament_id := self.prompt_for_tournament_id():
-            if self.confirm_command:
+        print("\n")
+        instructions = "Enter tournament ID to select a tournament"
+        instructions += "\n   or (<ctrl>+D or enter to skip)"
+        if self.list_command:
+            shortcuts = {self.list_key: self.list_key}
+            instructions += f"\n   or '{self.list_key}' and enter to list tournaments"
+        else:
+            shortcuts = {}
+        print(instructions)
+        if tournament_id := self.prompt_for_tournament_id(prompt_txt="tournament ID > ", shortcuts=shortcuts):
+            if tournament_id == self.list_key:
+                self.issuecmd(self.list_command)
+            elif self.confirm_command:
                 self.confirm_command.set_command_params(tournament_id=tournament_id)
                 self.issuecmd(self.confirm_command)
-        elif self.confirm_command:
+        else:
             self.issuecmd(self.cancel_command)
 
     @staticmethod
-    def prompt_for_tournament_id(prompt_txt: str = None) -> str:
+    def prompt_for_tournament_id(prompt_txt: str = None, shortcuts: dict[str, str] = None, text: str = None) -> str:
         """Displays a prompt to enter a tournament ID"""
+        if text:
+            print(text)
         prompt_txt = prompt_txt or "Enter a tournament ID > "
         return prompt_v(
             prompt=prompt_txt,
             validator=r"^[a-zA-Z0-9\-_]+$",
             not_valid_msg="Only alphanumeric characters, hyphen and underscore",
             skip_blank=True,
+            shortcuts=shortcuts
         )
 
 
@@ -198,3 +214,57 @@ class TournamentMetaEditor(BaseView):
             return user_data
         else:
             self.status.notify_warning("Abandoning changes.")
+
+
+class TournamentDetailsView(AbstractView):
+    """Displays some details about a tournament
+    """
+    def __init__(self,
+                 cmd_manager: commands_abc.CommandManagerInterface,
+                 tournament_id: str,
+                 status: str,
+                 turn_count: int = None,
+                 participants_count: int = None,
+                 location: str = None,
+                 start_date: date = None,
+                 end_date: date = None,
+                 current_turn_idx: int = None,
+                 current_turn_name: str = None,
+                 current_turns_status: str = None,
+                 **kwargs
+                 ):
+        super().__init__(cmd_manager)
+        self.tournament_id = tournament_id
+        self.status = status
+        self.turn_count = turn_count
+        self.participants_count = participants_count
+        self.location = location
+        self.start_date = start_date
+        self.end_date = end_date
+        self.current_turn_idx = current_turn_idx
+        self.current_turn_name = current_turn_name
+        self.current_turns_status = current_turns_status
+
+    def render(self):
+        print(self.details_template())
+
+    def details_template(self):
+        if self.start_date:
+            start_date_str = ", {} {}".format(
+                "scheduled" if self.status == "open" else "started",
+                formatdate(self.start_date, "%d/%m/%Y"))
+        else:
+            start_date_str = " not scheduled yet"
+        if self.end_date and self.status == "ended":
+            end_date_str = f", ended {formatdate(self.end_date, "%d/%m/%Y")}"
+        else:
+            end_date_str = ""
+        tpl = (f"Tournament {self.tournament_id} in {self.location.strip() or "???"}{start_date_str}{end_date_str}")
+        if self.participants_count:
+            tpl += f"\n{self.participants_count} participants"
+        if self.current_turn_idx and self.status == "running":
+            tpl += f"\nRound {self.current_turn_idx}/{self.turn_count}"
+            tpl += f": {self.current_turn_name} ({self.current_turns_status})"
+        elif self.turn_count:
+            tpl += f"\n{self.turn_count} turns"
+        return tpl

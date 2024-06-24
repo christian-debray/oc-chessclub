@@ -1,7 +1,6 @@
 from app.models.player_model import is_valid_national_player_id
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
-from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key
-from app.helpers.string_formatters import format_cols
+from app.helpers.text_ui import prompt_v, confirm, clear, proceed_any_key, format_table
 import app.helpers.validation as validation
 from datetime import date
 from app.views.views_abc import AbstractView
@@ -43,7 +42,7 @@ class PlayerListView:
     @staticmethod
     def player_list_str(players: list[dict]) -> str:
         p_lines = [PlayerView.player_template(p, as_cells=True) for p in players]
-        return format_cols(p_lines, ["Player ID", "Name", "Birthdate"])
+        return format_table([["Player ID", "Name", "Birthdate"]] + p_lines)
 
 
 class PlayerEditor(AbstractView):
@@ -111,15 +110,10 @@ class PlayerEditor(AbstractView):
         elif playerdata['surname']:
             self.status.notify_warning(f"Keeping previous value: {playerdata['surname']}\n")
 
-        id_prompt = (
-            "National Player ID"
-            if not playerdata.get('national_player_id')
-            else f"National Player ID (current= {playerdata.get('national_player_id')})"
-        ) + ":\n"
-        if new_national_player_id := PlayerIDPrompt.getinput(prompt=id_prompt):
-            edited_player['national_player_id'] = new_national_player_id
-        elif playerdata['national_player_id']:
-            self.status.notify_warning(f"Keeping previous value: {playerdata['national_player_id']}\n")
+        # dont't prompt for ID when player is already registered...
+        if not playerdata.get('national_player_id'):
+            if new_national_player_id := PlayerIDPrompt.getinput(prompt="National Player ID:\n"):
+                edited_player['national_player_id'] = new_national_player_id
 
         birthdate_prompt = (
             "Birthdate"
@@ -163,16 +157,18 @@ class PlayerIDPrompt(AbstractView):
     def render(self):
         val = self.getinput(self.prompt)
         if val is not None and self.confirmcommand:
-            self.confirmcommand.set_command_params(val)
+            self.confirmcommand.set_command_params(player_id=val)
             self.issuecmd(self.confirmcommand)
         elif self.cancelcommand:
             self.issuecmd(self.cancelcommand)
 
     @staticmethod
-    def getinput(prompt):
+    def getinput(prompt, shortcuts: dict[str, str] = None):
+
         return prompt_v(
             prompt=f"{prompt}",
             validator=is_valid_national_player_id,
             not_valid_msg="Not a valid Player ID. format: LLDDDDD (ex.: AZ12345)",
             skip_blank=True,
+            shortcuts=shortcuts
         )

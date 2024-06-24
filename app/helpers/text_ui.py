@@ -13,12 +13,21 @@ def prompt_v(
     validator: str | Callable = None,
     not_valid_msg: str = None,
     skip_blank=False,
+    shortcuts: dict[str, str] = None
 ):
-    """Prompts user for input and validates the input.
-    Returns value only if validated.
+    """Prompts user for input and validates the input, with a basic support for shortcuts.
+    Returns value only if validated, or the value associated with a shortuct if the shortcut is
+    entered by the user.
 
     If skip_blank is True, skips validation when user input is empty and returns None.
     """
+    keymap = {}
+    if shortcuts:
+        # shortcuts are case-insensitive
+        for k, v in shortcuts.items():
+            keymap[k] = v
+            keymap[k.upper()] = v
+            keymap[k.lower()] = v
     try:
         valid = False
         user_val = None
@@ -26,6 +35,8 @@ def prompt_v(
             user_val = input(prompt)
             if skip_blank and not user_val:
                 raise EOFError
+            if user_val in keymap:
+                return keymap[user_val]
             if validator is not None:
                 valid = (
                     validator(user_val)
@@ -112,3 +123,104 @@ else:
         Returns True if user confirmed, False otherwise."""
         confirm = input(ansi.Formatter.format(msg, ansi.Formatter.CYAN))
         return confirm.upper() == "Y"
+
+
+def format_table(
+    table_data: list[list[str]],
+    pad_left: int = 1,
+    pad_right: int = 1,
+    cell_sep: str = "|",
+    line_sep: str = "-",
+) -> str:
+    """Formats a list of string cells as a table."""
+    # first evaluate the dimensions: row lines and  column widths
+    if len(table_data) == 0:
+        return ""
+    table: list[list[list[str]]] = []
+    heights = [0 for _ in range(len(table_data))]
+    widths = [0 for _ in range(len(table_data[0]))]
+    for r in range(len(table_data)):
+        row = table_data[r]
+        table.append([])
+        for c in range(len(row)):
+            cell = row[c].splitlines() if row[c] else []
+            if cell:
+                cell_w = max([len(lc) for lc in cell])
+            else:
+                cell_w = 0
+                cell = []
+            if cell_w > widths[c]:
+                widths[c] = cell_w
+            if len(cell) > heights[r]:
+                heights[r] = len(cell)
+            table[-1].append(cell)
+
+    lines = []
+
+    if line_sep:
+        ruler = (
+            "+"
+            + "+".join(
+                [line_sep * (pad_left + pad_right + c_width) for c_width in widths]
+            )
+            + "+"
+        )
+    for r in range(len(heights)):
+        row_str = []
+        if line_sep:
+            row_str.append(ruler)
+        # row line
+        if r > len(table):
+            continue
+        for rl in range(heights[r]):
+            line_inner = []
+            # columns
+            for c in range(len(widths)):
+                if c > len(table[r]):
+                    continue
+                empty_cell_line = " " * (pad_left + widths[c] + pad_right)
+                if rl < len(table[r][c]):
+                    line_inner.append(
+                        " " * pad_left
+                        + table[r][c][rl].ljust(widths[c])
+                        + " " * pad_right
+                    )
+                else:
+                    line_inner.append(empty_cell_line)
+            if cell_sep:
+                row_str.append(cell_sep + cell_sep.join(line_inner) + cell_sep)
+            else:
+                row_str.append("".join(line_inner))
+        lines.append("\n".join(row_str))
+    if line_sep:
+        lines.append(ruler)
+    return "\n".join(lines)
+
+    # then output the table
+
+
+if __name__ == "__main__":
+    lorem_ipsum = """Lorem ipsum dolor sit amet,
+    consectetur adipiscing elit. Suspendisse ut consequat lectus.
+    Aenean maximus est eget magna volutpat, in dignissim."""
+
+    table_data = [
+        [
+            "Lorem Ipsum",
+            "dolor sit amet,\nconsectetur adipiscing elit.",
+            "Suspendisee\n\nut consequat",
+            "lectus.",
+        ],
+        ["", "Aenean\nmaximus\nest", "\neget", "magna\voluptat, in dignissim"],
+        [
+            "Lorem Ipsum",
+            "dolor sit amet,",
+            "consectetur adipiscing elit.",
+            "Suspendisse",
+        ],
+        ["ut consequat lectus.", "", "", "Aenean maximus est"],
+        ["magna volutpat,", "in dignissim.", "", ""],
+    ]
+
+    table_str = format_table(table_data, pad_left=1, pad_right=1)
+    print(table_str)

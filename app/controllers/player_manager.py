@@ -23,13 +23,7 @@ class EditPlayerCommand(commands.LaunchManagerCommand):
         super().__init__(
             app=app, cls_or_obj=PlayerManager, method=PlayerManager.edit_player
         )
-        self.params = {"player_id": player_id}
-
-    def set_player_id(self, player_id):
-        self.params["player_id"] = player_id
-
-    def set_command_params(self, *args, **kwargs):
-        self.set_player_id(*args)
+        self.set_command_params(player_id=player_id)
 
 
 class ListAllPlayersCommand(commands.LaunchManagerCommand):
@@ -50,11 +44,12 @@ class NewPlayerDataCommand(commands.LaunchManagerCommand):
 
 class UpdatePlayerDataCommand(commands.LaunchManagerCommand):
 
-    def __init__(self, app: commands_abc.CommandManagerInterface, player_data: dict):
+    def __init__(self, app: commands_abc.CommandManagerInterface, player_id: str, player_data: dict):
         super().__init__(
             app=app,
             cls_or_obj=PlayerManager,
             method=PlayerManager.update_player,
+            player_id=player_id,
             **player_data,
         )
 
@@ -94,7 +89,8 @@ class PlayerManager(BaseController):
         )
         menu.add_option(
             MenuOption(
-                option_text="Return to main menu",
+                option_text="Return to previous menu",
+                alt_key="X",
                 command=commands.ExitCurrentCommand(self.main_app),
             )
         )
@@ -110,21 +106,6 @@ class PlayerManager(BaseController):
             update_player_command=NewPlayerDataCommand(app=self.main_app),
         )
         self.main_app.view(editor)
-
-    def select_player(self, player_id):
-        """Selects a player from the database for further operation"""
-        selected_player = None
-        if player_id:
-            selected_player = self.player_repo.find_by_id(player_id)
-        if selected_player is not None:
-            self.status.notify_success(
-                f"Selected player {selected_player.id()}: {selected_player.name} {selected_player.surname}"
-            )
-            return selected_player
-        else:
-            self.status.notify_failure(
-                "Failed to select player - check the National Player ID."
-            )
 
     def edit_player(self, player_id: str | Player = None):
         """Edit player identified by player ID."""
@@ -150,7 +131,7 @@ class PlayerManager(BaseController):
             player_data=player.asdict(),
             status=self.status,
             update_player_command=UpdatePlayerDataCommand(
-                app=self.main_app, player_data=player.asdict()
+                app=self.main_app, player_id=player_id, player_data=player.asdict()
             ),
             cancel_command=None,
         )
@@ -191,19 +172,22 @@ class PlayerManager(BaseController):
         return False
 
     def update_player(
-        self, national_player_id: str, name: str, surname: str, birthdate: date
+        self, player_id: str, national_player_id: str, name: str, surname: str, birthdate: date
     ) -> bool:
         """Updates an existing player in the database.
+
+        player_id: ID of the record in the DB. Obviously None when we create a nwe player
+        national_player_id: in theory always equal to player_id
+        once the player data is stored in the repo...
 
         First compares old player data with new player data.
 
         - If nothing has changed, send a notificaiton to the user and return.
-        - If the player ID has changed, first remove the old ID from the repository,
-        then update or create the new one.
+        - For the moment, changing the National player ID is not allowed.
         - In all other cases update the existing player data in the repository.
         Notify user and returns True on success.
         """
-        player_data = self.player_repo.find_by_id(national_player_id)
+        player_data = self.player_repo.find_by_id(player_id) if player_id is not None else None
         if not player_data:
             self.add_new_player(national_player_id, name, surname, birthdate)
         try:
@@ -221,20 +205,10 @@ class PlayerManager(BaseController):
                 )
                 return False
             if player_data.id() != new_player_data.id():
-                # We must delete the existing player data first
-                # Then check if the new ID already exists,
-                # in which case we just udpate a player
-                # otherwise we must register a new player
-                self.status.notify("Changing player ID: deleting old record...")
-                self.player_repo.delete(player_data.id())
-                if not self.player_repo.find_by_id(new_player_data.id()):
-                    return self.add_new_player(
-                        player_id=national_player_id,
-                        name=name,
-                        surname=surname,
-                        birthdate=birthdate,
-                    )
-
+                self.status.notify_failure(
+                    "Forbidden: can't change the National Player ID."
+                )
+                raise Exception('Trying to change the National Player ID.')
             self.player_repo.update(new_player_data)
             self.player_repo.commit_changes()
             self.status.notify_success(f"Updated player: {new_player_data.id()}")
