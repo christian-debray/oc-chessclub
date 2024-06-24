@@ -172,22 +172,23 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                     ),
                 )
             )
-            menu.add_option(
-                MenuOption(
-                    option_text="Player scores and ranks",
-                    command=DisplayRankingListCommand(
-                        app=self.main_app,
-                        tournament_id=current_tournament.id())
+            if current_tournament.has_started():
+                menu.add_option(
+                    MenuOption(
+                        option_text="Player scores and ranks",
+                        command=DisplayRankingListCommand(
+                            app=self.main_app,
+                            tournament_id=current_tournament.id())
+                    )
                 )
-            )
-            menu.add_option(
-                MenuOption(
-                    option_text="Round details",
-                    command=ViewRoundInfoCommand(app=self.main_app,
-                                                 round_idx=None,
-                                                 tournament_id=current_tournament.id()))
-                )
-            if current_tournament.can_start() and current_tournament.status == "open":
+                menu.add_option(
+                    MenuOption(
+                        option_text="Round details",
+                        command=ViewRoundInfoCommand(app=self.main_app,
+                                                     round_idx=None,
+                                                     tournament_id=current_tournament.id()))
+                    )
+            if current_tournament.can_start() and not current_tournament.has_started():
                 menu.add_option(
                     MenuOption(
                         option_text="Start this tournament",
@@ -204,7 +205,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
             elif current_tournament.status() == "running":
                 menu.add_option(
                     MenuOption(
-                        option_text="list matches",
+                        option_text="List matches in current round",
                         command=ListMatchesCommand(app=self.main_app),
                     )
                 )
