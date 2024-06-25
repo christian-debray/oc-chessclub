@@ -1,0 +1,22 @@
+{
+ "b4c0caaa-a1a5-477b-b1e2-755b889bb5a1": {
+  "tournament_id": "b4c0caaa-a1a5-477b-b1e2-755b889bb5a1",
+  "start_date": "2024-06-25",
+  "end_date": "2024-06-25",
+  "location": "Paris",
+  "description": "test tournament 1",
+  "data_file": "b4c0caaa-a1a5-477b-b1e2-755b889bb5a1.json",
+  "round_count": 4,
+  "status": "ended"
+ },
+ "8afbb1cd-ef16-4e2f-bba9-2629e9c7c565": {
+  "tournament_id": "8afbb1cd-ef16-4e2f-bba9-2629e9c7c565",
+  "start_date": "2024-07-12",
+  "end_date": null,
+  "location": "Saint-Malo",
+  "description": "None",
+  "data_file": "8afbb1cd-ef16-4e2f-bba9-2629e9c7c565.json",
+  "round_count": 6,
+  "status": "open"
+ }
+}

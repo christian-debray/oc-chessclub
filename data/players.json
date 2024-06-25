@@ -1,0 +1,38 @@
+{
+ "TS01023": {
+  "national_player_id": "TS01023",
+  "surname": "TestSurname",
+  "name": "TestFirst",
+  "birthdate": "2000-01-01"
+ },
+ "FR23456": {
+  "national_player_id": "FR23456",
+  "surname": "Machin",
+  "name": "Toto",
+  "birthdate": "1987-01-18"
+ },
+ "UK15671": {
+  "national_player_id": "UK15671",
+  "surname": "Stuart",
+  "name": "Marie",
+  "birthdate": "1990-06-23"
+ },
+ "BV09123": {
+  "national_player_id": "BV09123",
+  "surname": "Baggins",
+  "name": "Bilbo",
+  "birthdate": "1977-06-07"
+ },
+ "UK09121": {
+  "national_player_id": "UK09121",
+  "surname": "Lovelace",
+  "name": "Ada",
+  "birthdate": "1956-07-12"
+ },
+ "FR01296": {
+  "national_player_id": "FR01296",
+  "surname": "Rostand",
+  "name": "Raymond",
+  "birthdate": "1989-11-11"
+ }
+}
