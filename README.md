@@ -10,28 +10,19 @@ by the local chess club.
 
 A Chess tournament is played at a location, at a given date.
 Participants are registered with their national player ID.
-A tournament is divided in rounds where each participant plays exactly 1 match against
-another participant. Players are paired basing on their current score.
+A tournament is broken down into subsequent rounds where each participant plays exactly one match against
+another participant. At each round, players are paired basing on their current rank in the tournament.
 
 ## Available Features
 
  The chess club manager is a desktop app running in text mode on a console, and should work fine on linux,
  windows and MacOS.
 
-  - Maintain a small player database:
-    - register new players
-    - edit player data
-    - list players
-  - Manage tournament data:
-    - create new tournament
-    - edit tournament general infos
-  - Run tournaments:
-    - register players
-    - start next round
-    - record match results
-    - round overview
-  - Display reports
-  - Store data locally
+  - **Manage a small player database:** player registration, editing
+  - **Manage tournament data:** tournament creation, add participants, edit infos
+  - **Run tournaments:** start rounds, manage matches, display ranking lists
+  - **Display reports:** display reports on registered players and tournaments
+  - **Store data locally:** All data handled by the app is stored to the local file system in JSON format, in a data folder.
 
 ## Installing the app
 
@@ -70,12 +61,32 @@ The menus displayed by the app will guide you through the different features and
 
 ## Data files
 
-The app stores its data in the `data/` folder, in JSON format.
+The app stores its data in the `data/` folder, in JSON format. This repo contains some sample data:
+a small players DB and 3 tournaments in various states (open, running and closed)
 
   - **Player details** are stored separately in the `data/players.json` file.
   - **Tournaments** are stored in the `data/tournament` folder:
      - Each tournament has its own JSON file in the tournament folder.
      - A special `tournament_index.json` stores an index and metadata of all tournaments.
+
+## Tests
+
+The data model is covered by unit tests written with Pyhton's unittest library:
+
+```
+python -m unittest discover tests/
+```
+
+## Automation
+For testing purposes, the app supports some kind of rudimentary automation by script files.
+Script files contain sequences of calls to the app controllers.
+Examples of such scripts can be found in the demo/ folder.
+
+To run a script:
+
+```
+python main.py --script <path_to_script_file>
+```
 
 ## General implementation notes
 
@@ -113,10 +124,6 @@ The latest report for this app can be found in the `flake8_rapport/` folder.
   + (app root dir)
   |
   +-- main.py (main script to launch the app)
-  +--+ data/ (data folder)
-  |  |
-  |  +-- players.json
-  |  +-- tournaments/ (tournament json files, including tournament index)
   |
   +--+ app/ (the app python files)
   |  |
@@ -126,8 +133,15 @@ The latest report for this app can be found in the `flake8_rapport/` folder.
   |  +-- helpers/ (various helpers: validation, ui toolkits, string formatters, ...)
   |  +-- models/ (data model classes)
   |  +-- views (UI classes)
+  |
+  +--+ data/ (data folder)
+  |  |
+  |  +-- players.json
+  |  +-- tournaments/ (tournament json files, including tournament index)
   |   
+  +--+ demo/ (demo scripts folder)
+  |
   +-- flake8_rapport/
   |
-  +-- tests/
+  +-- tests/ (unit tests)
 ```
