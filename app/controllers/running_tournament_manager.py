@@ -3,7 +3,7 @@ from app.commands import commands
 from app.commands.commands_abc import CommandInterface
 from app.controllers.controller_abc import MainController
 from app.models.player_model import PlayerRepository
-from app.models.tournament_model import TournamentRepository, Round, Match
+from app.models.tournament_model import TournamentRepository, Match
 from app.controllers import tournament_manager
 from app.views.menu import Menu, MenuOption
 from app.views.tournament.running_tournament import (
@@ -306,30 +306,6 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
             cmd_manager=self.main_app, round_data=self._tournament_round_data(round)
         )
         self.main_app.view(v)
-
-    def _match_data(self, match_list: list[tuple[int, Match]]):
-        """returns a view of a list of matches as a dict,
-        indexed by the matches index."""
-        matches_data = {}
-        for m, m_details in match_list:
-            matches_data[m] = {
-                "idx": m,
-                "player1": m_details.player1().asdict(),
-                "player2": m_details.player2().asdict(),
-                "score_player1": m_details.player_score(m_details.player1().id()),
-                "score_player2": m_details.player_score(m_details.player2().id()),
-                "start_time": m_details.start_time,
-                "end_time": m_details.end_time,
-            }
-        return matches_data
-
-    def _tournament_round_data(self, round: Round) -> dict:
-        """Returns a dict containing a round's data"""
-        round_data = {
-            "name": round.name,
-            "matches": self._match_data(enumerate(round.matches)),
-        }
-        return round_data
 
     def start_match(
         self,

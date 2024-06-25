@@ -3,9 +3,11 @@ from app.commands import commands
 from app.controllers.controller_abc import BaseController, MainController
 from app.models.player_model import PlayerRepository
 from app.models.tournament_model import (
-    TournamentRepository,
+    Match,
+    Round,
     TournamentMetaData,
     Tournament,
+    TournamentRepository
 )
 from app.views.views_abc import SimpleView
 from app.views.menu import Menu, MenuOption
@@ -63,11 +65,12 @@ class SelectTournamentCommand(commands.LaunchManagerCommand):
 
 
 class ListTournamentsCommand(commands.LaunchManagerCommand):
-    def __init__(self, app: commands.CommandManagerInterface) -> None:
+    def __init__(self, app: commands.CommandManagerInterface, sort_by_date: bool = False) -> None:
         super().__init__(
             app=app,
             cls_or_obj=TournamentManager,
             method=TournamentManager.list_tournaments,
+            sort_by_date=sort_by_date
         )
 
 
@@ -142,12 +145,15 @@ class ListRegisteredPlayersCommand(commands.LaunchManagerCommand):
         self,
         app: commands.CommandInterface,
         tournament_id: str,
+        sorted_by: str = None
+
     ):
         super().__init__(
             app=app,
             cls_or_obj=TournamentManager,
             method=TournamentManager.list_registered_players,
             tournament_id=tournament_id,
+            sorted_by=sorted_by
         )
 
 
@@ -162,6 +168,20 @@ class ListAvailablePlayersCommand(commands.LaunchManagerCommand):
             cls_or_obj=TournamentManager,
             method=TournamentManager.list_available_players,
             tournament_id=tournament_id,
+        )
+
+
+class TournamentInfoCommand(commands.LaunchManagerCommand):
+    def __init__(
+        self,
+        app: commands.CommandInterface,
+        tournament_id: str
+    ):
+        super().__init__(
+            app=app,
+            cls_or_obj=TournamentManager,
+            method=TournamentManager.tournament_info,
+            tournament_id=tournament_id
         )
 
 
@@ -223,6 +243,30 @@ class TournamentManagerBase(BaseController):
             logger.error(e)
             self.status.notify_failure(f"Invalid tournament ID: {e}")
         return tournament
+
+    def _match_data(self, match_list: list[tuple[int, Match]]):
+        """returns a view of a list of matches as a dict,
+        indexed by the matches index."""
+        matches_data = {}
+        for m, m_details in match_list:
+            matches_data[m] = {
+                "idx": m,
+                "player1": m_details.player1().asdict(),
+                "player2": m_details.player2().asdict(),
+                "score_player1": m_details.player_score(m_details.player1().id()),
+                "score_player2": m_details.player_score(m_details.player2().id()),
+                "start_time": m_details.start_time,
+                "end_time": m_details.end_time,
+            }
+        return matches_data
+
+    def _tournament_round_data(self, round: Round) -> dict:
+        """Returns a dict containing a round's data"""
+        round_data = {
+            "name": round.name,
+            "matches": self._match_data(enumerate(round.matches)),
+        }
+        return round_data
 
 
 class TournamentManager(TournamentManagerBase):
@@ -297,6 +341,13 @@ class TournamentManager(TournamentManagerBase):
             )
         )
         if current_tournament_id := self._curr_tournament_id():
+            menu.add_option(
+                MenuOption(
+                    option_text="View Tournament Info",
+                    command=TournamentInfoCommand(app=self.main_app,
+                                                  tournament_id=current_tournament_id)
+                )
+            )
             menu.add_option(
                 MenuOption(
                     option_text="Edit Current Tournament Info",
@@ -400,12 +451,38 @@ class TournamentManager(TournamentManagerBase):
             confirm_cmd.set_command_params(tournament_id=tournament.id())
             self.main_app.receive(confirm_cmd)
 
-    def list_tournaments(self):
+    def list_tournaments(self, sort_by_date: bool = False):
         """Display a list of all tournaments."""
         tournaments = self.tournament_repo.list_tournament_meta()
+        if sort_by_date:
+            tournaments.sort(key=lambda x: x.start_date)
         data = [m.asdict() for m in tournaments]
         v = tournament_views.TournamentsListView(
             cmd_manager=self.main_app, title="All Tournaments", tournament_list=data
+        )
+        self.main_app.view(v)
+
+    def tournament_info(self, tournament_id: str):
+        """Display info view on selected tournament
+        """
+        if not tournament_id:
+            self.main_app.receive(
+                SelectTournamentCommand(
+                    app=self.main_app,
+                    confirm_cmd=TournamentInfoCommand(app=self.main_app, tournament_id=None)
+                )
+            )
+            return
+        tournament_metadata = self._tournament_meta(tournament_id)
+        if not tournament_metadata:
+            return
+        title = "Tournament Info"
+        if tournament_id == self._curr_tournament_id():
+            title = "Current Tournament Info"
+        v = tournament_views.TournamentInfoView(
+            title=title,
+            tournament_data=tournament_metadata.asdict(),
+            cmd_manager=self.main_app
         )
         self.main_app.view(v)
 
@@ -684,11 +761,32 @@ class TournamentManager(TournamentManagerBase):
             self.main_app.view(v)
             return
 
-    def list_registered_players(self, tournament_id: str = None):
-        """Display a list of players registered in a tournament"""
-        tournament_id = tournament_id or self._curr_tournament_id()
+    def list_registered_players(self, tournament_id: str = None, sorted_by: str = None):
+        """Display a list of players registered in a tournament.
+
+        sorted_by: sort key (currently only 'alpha' is supported to sort by ascending player name)
+        """
+        if not tournament_id:
+            # tournament ID is required.
+            self.main_app.receive(
+                SelectTournamentCommand(
+                    app=self.main_app,
+                    confirm_cmd=ListRegisteredPlayersCommand(
+                        app=self.main_app,
+                        tournament_id=None,
+                        sorted_by=sorted_by
+                    )
+                )
+            )
+            return
         tournament = self._get_tournament(tournament_id=tournament_id)
+        if not tournament:
+            return
         registered_players_datalist = [p.asdict() for p in tournament.participants]
+        if sorted_by == "alpha":
+            registered_players_datalist.sort(
+                key=lambda x: x.get("surname", "").upper() + x.get("name", "").capitalize()
+                )
         v = PlayerListView(
             player_list=registered_players_datalist,
             title=f"Registered Players - tournament in {tournament.metadata.location}",

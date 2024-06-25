@@ -14,7 +14,12 @@ from app.views.menu import MenuOption, Menu
 from app.models.player_model import PlayerRepository
 from app.controllers.player_manager import PlayerManager
 from app.models.tournament_model import TournamentRepository
-from app.controllers import tournament_manager, running_tournament_manager
+from app.controllers import (
+    tournament_manager,
+    running_tournament_manager,
+    reports_manager,
+)
+
 # from app.controllers.tournament_manager import TournamentManager
 # from app.controllers.running_tournament_manager import RunningTournamentManager
 
@@ -57,6 +62,8 @@ class AssetLoader:
                 return self.load_tournament_manager()
             case running_tournament_manager.RunningTournamentManager.__name__:
                 return self.load_running_tournament_manager()
+            case reports_manager.ReportsManager.__name__:
+                return self.load_reports_manager()
         raise ValueError(f"Failed to load instance of unknown class {cls_n}.")
 
     def load_player_repository(self) -> PlayerRepository:
@@ -84,14 +91,26 @@ class AssetLoader:
             )
         return self.tournament_manager
 
-    def load_running_tournament_manager(self) -> running_tournament_manager.RunningTournamentManager:
+    def load_running_tournament_manager(
+        self,
+    ) -> running_tournament_manager.RunningTournamentManager:
         if not self.running_tournament_manager:
-            self.running_tournament_manager = running_tournament_manager.RunningTournamentManager(
-                player_repo=self.load_player_repository(),
-                tournament_repo=self.load_tournament_repository(),
-                main_app=self.app,
+            self.running_tournament_manager = (
+                running_tournament_manager.RunningTournamentManager(
+                    player_repo=self.load_player_repository(),
+                    tournament_repo=self.load_tournament_repository(),
+                    main_app=self.app,
+                )
             )
         return self.running_tournament_manager
+
+    def load_reports_manager(self) -> reports_manager.ReportsManager:
+        instance = reports_manager.ReportsManager(
+            player_repo=self.player_repo,
+            tournament_repo=self.tournament_repo,
+            main_app=self.app,
+        )
+        return instance
 
 
 class MainMenuCommand(CommandInterface):
@@ -200,19 +219,30 @@ class MainController(MainController):
                 command=tournament_manager.LoadTournamentCommand(
                     app=self,
                     confirm_cmd=commands.LaunchManagerCommand(
-                        app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
-                    ))
+                        app=self,
+                        cls_or_obj=running_tournament_manager.RunningTournamentManager,
+                    ),
+                ),
             )
         )
-        if self.get_state('current_tournament_id'):
+        if self.get_state("current_tournament_id"):
             menu_view.add_option(
                 MenuOption(
                     option_text="Run Current Tournament",
                     command=commands.LaunchManagerCommand(
-                        app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
-                    )
+                        app=self,
+                        cls_or_obj=running_tournament_manager.RunningTournamentManager,
+                    ),
                 )
             )
+        menu_view.add_option(
+            MenuOption(
+                option_text="Reports",
+                command=commands.LaunchManagerCommand(
+                    app=self, cls_or_obj=reports_manager.ReportsManager
+                ),
+            )
+        )
         menu_view.add_option(
             MenuOption(
                 option_text="Exit", alt_key="X", command=ExitCurrentCommand(self)

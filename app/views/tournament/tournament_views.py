@@ -30,6 +30,47 @@ class TournamentMetaView(AbstractView):
         return cells if as_cells else " - ".join(cells)
 
 
+class TournamentInfoView(BaseView):
+    """Displays a full view of tournament infos.
+    """
+    def __init__(self,
+                 tournament_data: dict,
+                 title: str = None,
+                 cmd_manager: commands_abc.CommandManagerInterface = None):
+        super().__init__(cmd_manager=cmd_manager, title=title)
+        self.tournament_data = tournament_data
+
+    def render(self):
+        super().render()
+        print(self.tournament_view_tpl(self.tournament_data))
+
+    @staticmethod
+    def tournament_view_tpl(data: dict) -> str:
+        start_date_tpl = formatdate(d=data.get("start_date"), fmt="%d/%m/%Y", empty="")
+        end_date_tpl = formatdate(d=data.get("end_date"), fmt="%d/%m/%Y", empty="")
+        dates_tpl = ""
+        if data.get('status') == "open":
+            if start_date_tpl:
+                dates_tpl += f"scheduled on {start_date_tpl}"
+            else:
+                dates_tpl += "not scheduled yet"
+        elif data.get('status') == "running":
+            dates_tpl += f" started on {start_date_tpl}"
+        elif data.get('status') == "ended":
+            dates_tpl += f"from {start_date_tpl} to {end_date_tpl}"
+        else:
+            dates_tpl += " ???"
+        tournament_tpl = f"""
+Tournament ID: {data.get('tournament_id')}
+Location:      {data.get('location', "(not set)")}
+Dates:         {dates_tpl}
+Status:        {data.get('status')}
+Rounds:        {data.get("round_count")}
+Description:   {data.get("description")}
+"""
+        return tournament_tpl
+
+
 class TournamentsListView(BaseView):
     """Display a list of tournaments"""
 
