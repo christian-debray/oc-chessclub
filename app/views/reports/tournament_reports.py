@@ -22,7 +22,7 @@ class ExportToHTMLDialog(dialogs.Dialog):
         if not self.text:
             self.text = "Export this report to HTML ?"
             self.text += "\nIf yes, enter the path to an ouptut file."
-            self.text += "\nPress Enter of <ctrl>+D otherwise."
+            self.text += "\nPress Enter or <ctrl>+D otherwise."
             cwd = Path('.').resolve()
             self.text += f"\n(current working directory: {cwd})"
 
