@@ -582,7 +582,7 @@ class TournamentManager(TournamentManagerBase):
         try:
             # start_date, "location", "round_count", "description"
             if d_str := kwargs.get("start_date"):
-                u_start_date = date.fromisoformat(d_str)
+                u_start_date = d_str if isinstance(d_str, date) else date.fromisoformat(d_str)
             else:
                 u_start_date = None
             u_location = kwargs.get("location") or None
@@ -606,7 +606,7 @@ class TournamentManager(TournamentManagerBase):
             logger.error(e)
             self.status.notify_failure("Failed to store changes: unexpected error.")
 
-    def register_player(self, tournament_id: str = None, player_id: str = None):
+    def register_player(self, tournament_id: str = None, player_id: str = None, repeat: bool = True):
         """Register a player in a tournament.
 
         Tournament_id defaults to the current tournament.
@@ -663,11 +663,12 @@ class TournamentManager(TournamentManagerBase):
                 self.status.notify_success(
                     f"Player {player} joined tournament {tournament.id()}."
                 )
-                self.main_app.receive(
-                    RegisterPlayerCommand(
-                        app=self.main_app, tournament_id=tournament.id()
+                if repeat:
+                    self.main_app.receive(
+                        RegisterPlayerCommand(
+                            app=self.main_app, tournament_id=tournament.id()
+                        )
                     )
-                )
                 return
         except Exception as e:
             logger.error(f"Failed to update tournament after registering player: {e}")

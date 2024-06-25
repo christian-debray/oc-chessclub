@@ -468,6 +468,12 @@ class Tournament:
             if current_round.has_ended():
                 return None
             current_round.matches[match_index].start(start_time=start_time)
+            #
+            # if the tournament just started, also update the start date
+            #
+            if self.current_round_idx == 0:
+                if self.start_date().strftime("%Y-%m-%d") != start_time.strftime("%Y-%m-%d"):
+                    self.metadata.start_date = date.fromisoformat(start_time.strftime("%Y-%m-%d"))
             return current_round.matches[match_index]
         else:
             return None

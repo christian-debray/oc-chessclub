@@ -375,13 +375,18 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         try:
             match_idx = int(match_idx)
             round = tournament.current_round()
+            # winner_id might be a code used in scripts
+            if winner_id == "_player1_":
+                winner_id = round.matches[match_idx].player1().id()
+            elif winner_id == "_player2_":
+                winner_id = round.matches[match_idx].player2().id()
             if results := tournament.end_a_match(
                 match_index=match_idx, winner_id=winner_id, end_time=end_time
             ):
                 if self.tournament_repo.store_tournament(tournament):
-                    success_str = f"Ended match {match_idx+1}:\n"
-                    success_str += f"\n {results[0][0]}: {results[0][1]}"
-                    success_str += f"\n {results[1][0]}: {results[1][1]}"
+                    success_str = f"Ended match {match_idx+1}:"
+                    success_str += f"\n  {results[0][0]}: {results[0][1]}"
+                    success_str += f"\n  {results[1][0]}: {results[1][1]}\n"
                     self.status.notify_success(success_str)
                     if round.has_ended():
                         title = "Final Ranks and Scores" if tournament.has_ended() else "Current Ranks and Scores"

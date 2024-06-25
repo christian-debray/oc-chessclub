@@ -33,7 +33,7 @@ class JSONStorage(MutableMapping):
             if not self._file.parent.exists():
                 self._file.parent.mkdir(mode=0o777, parents=True, exist_ok=True)
             # check now we have proper access to the file:
-            self._file.touch(mode=0o777)
+            self._file.touch(mode=0o666)
             self._file.unlink()
 
     def load_store(self):
@@ -47,7 +47,7 @@ class JSONStorage(MutableMapping):
     def write_store(self):
         """Dumps this storage to its linked JSON file."""
         if not self._file.exists():
-            self._file.touch(mode=0o777)
+            self._file.touch(mode=0o666)
         with open(self._file, "w", encoding="utf8") as json_file:
             json.dump(
                 self._store, json_file, cls=self.encoder, indent=1, ensure_ascii=False

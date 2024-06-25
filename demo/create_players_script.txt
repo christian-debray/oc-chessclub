@@ -1,0 +1,19 @@
+#
+# Create Player database
+#
+
+PlayerManager.add_new_player({"national_player_id": "UK00201", "name": "Elisabeth", "surname": "Tudor", "birthdate": "1972-02-12"})
+PlayerManager.add_new_player({"national_player_id": "US00321", "name": "Charlie", "surname": "Chaplin", "birthdate": "1958-04-01"})
+PlayerManager.add_new_player({"national_player_id": "UK00223", "name": "Ada", "surname": "Lovelace", "birthdate": "1982-05-18"})
+PlayerManager.add_new_player({"national_player_id": "FR10342", "name": "Victor", "surname": "Hugo", "birthdate": "1969-12-23"})
+PlayerManager.add_new_player({"national_player_id": "FR90312", "name": "Marie", "surname": "Skłodowska-Curie", "birthdate": "1961-07-04"})
+PlayerManager.add_new_player({"national_player_id": "AT02342", "name": "Wolfgang Amadeus", "surname": "Mozart", "birthdate": "1998-06-20"})
+PlayerManager.add_new_player({"national_player_id": "ES12242", "name": "Pablo", "surname": "Picasso", "birthdate": "1976-10-01"})
+PlayerManager.add_new_player({"national_player_id": "DE18234", "name": "Heinrich", "surname": "Heine", "birthdate": "1992-07-31"})
+PlayerManager.add_new_player({"national_player_id": "FR90234", "name": "Louis", "surname": "De Broglie", "birthdate": "2004-01-13"})
+PlayerManager.add_new_player({"national_player_id": "US07134", "name": "Tracy", "surname": "Chapman", "birthdate": "1964-03-20"})
+PlayerManager.add_new_player({"national_player_id": "DE76442", "name": "Werner", "surname": "Heisenberg", "birthdate": "1993-11-17"})
+PlayerManager.add_new_player({"national_player_id": "DE65345", "name": "Romy", "surname": "Schneider", "birthdate": "1985-09-23"})
+PlayerManager.add_new_player({"national_player_id": "UK12023", "name": "Stanley", "surname": "Kubrick", "birthdate": "2001-01-01"})
+PlayerManager.add_new_player({"national_player_id": "IT00012", "name": "Leonardo", "surname": "Da Vinci", "birthdate": "2001-01-01"})
+PlayerManager.add_new_player({"national_player_id": "US15652", "name": "Aretha", "surname": "Franklin", "birthdate": "1969-03-25"})

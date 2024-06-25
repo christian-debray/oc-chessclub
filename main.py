@@ -19,6 +19,8 @@ from app.controllers import (
     running_tournament_manager,
     reports_manager,
 )
+from app.helpers.validation import is_valid_date, is_valid_datetime
+from datetime import date, datetime
 
 # from app.controllers.tournament_manager import TournamentManager
 # from app.controllers.running_tournament_manager import RunningTournamentManager
@@ -304,10 +306,26 @@ class MainController(MainController):
             line = 0
             for cmd_str in cmd_list:
                 line += 1
+                cmd_str = cmd_str.strip()
+                if len(cmd_str) == 0:
+                    # blank line
+                    continue
+                if cmd_str[0] == "#":
+                    # comment
+                    continue
                 cls_n = cmd_str[: cmd_str.index(".")]
                 method_n = cmd_str[cmd_str.index(".") + 1: cmd_str.index("(")]
                 if param_json := cmd_str[cmd_str.index("(") + 1: cmd_str.index(")")]:
-                    params = json.loads(param_json)
+                    params: dict = json.loads(param_json)
+                    logger.debug(f"decoded params: {params}")
+                    for p in params:
+                        d_str = str(params[p])
+                        if is_valid_date(d_str):
+                            logger.debug(f"try to decode date: {d_str} ({type(d_str).__name__})")
+                            params[p] = date.fromisoformat(d_str)
+                        elif is_valid_datetime(d_str):
+                            logger.debug(f"try to decode datetime: {d_str}")
+                            params[p] = datetime.fromisoformat(d_str)
                 else:
                     params = {}
                 script.append(
@@ -368,4 +386,13 @@ if __name__ == "__main__":
     logfile = Path(app.APPDIR, "debug.log")
     logging.basicConfig(filename=logfile, level=logging.DEBUG)
     chessApp = MainController()
-    chessApp.main()
+    import argparse
+    parser = argparse.ArgumentParser("chessclub_app")
+    parser.add_argument("--script", help="Execute a sequence of commands from a file")
+    args = parser.parse_args()
+    script = None
+    if args.script:
+        script_path = Path(args.script)
+        with open(script_path) as sf:
+            script = sf.readlines()
+    chessApp.main(cmd_script=script)
