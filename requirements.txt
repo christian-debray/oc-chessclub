@@ -11,3 +11,4 @@ Pygments==2.18.0
 pynput==1.7.7
 python-xlib==0.33
 six==1.16.0
+yattag==1.15.2
