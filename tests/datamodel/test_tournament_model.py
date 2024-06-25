@@ -76,7 +76,7 @@ class utils:
         return matches
 
     @staticmethod
-    def make_tournament_metadata(turns: int = 4) -> tournament_model.TournamentMetaData:
+    def make_tournament_metadata(rounds: int = 4) -> tournament_model.TournamentMetaData:
         return tournament_model.TournamentMetaData(
             tournament_id=utils.randstring(5),
             start_date=date.fromisoformat("2024-05-02"),
@@ -86,7 +86,7 @@ class utils:
                 [utils.randstring(random.randint(2, 12)) for _ in range(10)]
             ),
             data_file=utils.randstring(8) + ".json",
-            turn_count=turns,
+            round_count=rounds,
         )
 
     @staticmethod
@@ -94,7 +94,7 @@ class utils:
         tournament_meta = utils.make_tournament_metadata()
         tournament = tournament_model.Tournament(tournament_meta)
         match_list = utils.make_matches()
-        tournament.turns[0] = tournament_model.Round("test Round", matches=match_list)
+        tournament.rounds[0] = tournament_model.Round("test Round", matches=match_list)
         for m in match_list:
             tournament.participants.append(m.player1())
             tournament.participants.append(m.player2())
@@ -123,7 +123,7 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertEqual(player_data[0], [str(m.players[0][0].id()), m.players[0][1]])
         self.assertEqual(player_data[1], [str(m.players[1][0].id()), m.players[1][1]])
 
-    def test_turn_asdict(self):
+    def test_round_asdict(self):
         """Dump a valid Round to dict without failure, and check data is consistent."""
         match_list = utils.make_matches()
         Round = tournament_model.Round("test Round", matches=match_list)
@@ -144,25 +144,25 @@ class TestTournamentJSON(unittest.TestCase):
         self.assertEqual(len(test_dict_matches), len(Round.matches))
         for m in range(len(Round.matches)):
             dict_match_m: dict = test_dict_matches[m]
-            turn_match_m = Round.matches[m]
+            round_match_m = Round.matches[m]
             match_start_time = (
-                turn_match_m.start_time.isoformat()
-                if turn_match_m.start_time is not None
+                round_match_m.start_time.isoformat()
+                if round_match_m.start_time is not None
                 else None
             )
             match_end_time = (
-                turn_match_m.end_time.isoformat()
-                if turn_match_m.end_time is not None
+                round_match_m.end_time.isoformat()
+                if round_match_m.end_time is not None
                 else None
             )
             self.assertEqual(dict_match_m.get("start_time"), match_start_time)
             self.assertEqual(dict_match_m.get("end_time"), match_end_time)
             dict_match_m_players: tuple = dict_match_m.get("players")
-            for p in range(len(turn_match_m.players)):
+            for p in range(len(round_match_m.players)):
                 self.assertEqual(
-                    dict_match_m_players[p][0], turn_match_m.players[p][0].id()
+                    dict_match_m_players[p][0], round_match_m.players[p][0].id()
                 )
-                self.assertEqual(dict_match_m_players[p][1], turn_match_m.players[p][1])
+                self.assertEqual(dict_match_m_players[p][1], round_match_m.players[p][1])
 
     def test_tournament_asdict(self):
         """Export tournament data to a dict object."""
@@ -190,12 +190,12 @@ class TestTournamentJSON(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(len(t_data["turns"]), len(tournament.turns))
-        for t in range(len(tournament.turns)):
-            if tournament.turns[t] is None:
-                self.assertIsNone(t_data["turns"][t])
+        self.assertEqual(len(t_data["rounds"]), len(tournament.rounds))
+        for t in range(len(tournament.rounds)):
+            if tournament.rounds[t] is None:
+                self.assertIsNone(t_data["rounds"][t])
             else:
-                self.assertDictEqual(t_data["turns"][t], tournament.turns[t].asdict())
+                self.assertDictEqual(t_data["rounds"][t], tournament.rounds[t].asdict())
 
     def test_tournament_metadata_json(self):
         """Tournament Metadata can be safely exported to JSON and imported from JSON."""
@@ -317,7 +317,7 @@ class TestMatch(unittest.TestCase):
 class TestTurn(unittest.TestCase):
     """Test the Round class"""
 
-    def test_turn_setup(self):
+    def test_round_setup(self):
         """Setting up a Round with a list of pairs of players
         will create as many matches, and no match has started yet."""
         Round = tournament_model.Round("a Round")
@@ -334,7 +334,7 @@ class TestTurn(unittest.TestCase):
             self.assertEqual(m_match.scores(), ((players[0], 0.0), (players[1], 0.0)))
             self.assertEqual(m_match.has_started(), False)
 
-    def test_turn_find_player_match(self):
+    def test_round_find_player_match(self):
         """Find a match in a Round where a player participates."""
         Round = tournament_model.Round("a Round")
         player_pairs = [
@@ -378,7 +378,7 @@ class TestTournament(unittest.TestCase):
         self.assertIs(tournament.player_is_registered('FR 12345'), False)
         self.assertIs(tournament.player_is_registered('FR54321'), False)
 
-    def test_start_first_turn(self):
+    def test_start_first_round(self):
         """Starting the first Round starts the tournament and sets up matches for all pairs of players.
         None of the matches has started at this point."""
         tournament = tournament_model.Tournament(
@@ -389,13 +389,13 @@ class TestTournament(unittest.TestCase):
         for p in players:
             tournament.add_participant(p)
             check_players[p.id()] = False  # see assignement chekc below
-        tournament.start_next_turn()
+        tournament.start_next_round()
         self.assertIs(tournament.has_started(), True)
-        self.assertIsInstance(tournament.current_turn(), tournament_model.Round)
+        self.assertIsInstance(tournament.current_round(), tournament_model.Round)
         # 1 match for 2 players
-        self.assertEqual(len(tournament.current_turn().matches), 5)
+        self.assertEqual(len(tournament.current_round().matches), 5)
         # check all players have been assigned once
-        for m in tournament.current_turn().matches:
+        for m in tournament.current_round().matches:
             self.assertIs(m.has_started(), False)
             self.assertIs(check_players.get(m.player1().id()), False)
             self.assertIs(check_players.get(m.player2().id()), False)
@@ -409,7 +409,7 @@ class TestTournament(unittest.TestCase):
         """When assigning players to matches, avoid repeating matches played before."""
         #
         # To perfrom this test,
-        # we'll forge the first two turns to force a situation where
+        # we'll forge the first two rounds to force a situation where
         # all players have the same score and rank.
         #
         tournament = tournament_model.Tournament(
@@ -430,8 +430,8 @@ class TestTournament(unittest.TestCase):
             for p in range(0, len(tournament.participants), 2)
         ]
         self.assertEqual(len(pairs), len(tournament.participants) / 2)
-        tournament.start_next_turn(player_pairs=pairs)
-        for match in tournament.current_turn().matches:
+        tournament.start_next_round(player_pairs=pairs)
+        for match in tournament.current_round().matches:
             match.start()
             match.end()
         tournament.update_score_board()

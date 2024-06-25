@@ -129,7 +129,7 @@ class ViewRoundInfoCommand(commands.LaunchManagerCommand):
 
 
 class RunningTournamentManager(tournament_manager.TournamentManagerBase):
-    """Manage turns and matches of a running tournament."""
+    """Manage rounds and matches of a running tournament."""
 
     def __init__(
         self,
@@ -258,17 +258,17 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         if current_tournament := self._curr_tournament():
             tournament_data = current_tournament.metadata.asdict()
             tournament_data["participants_count"] = len(current_tournament.participants)
-            if current_turn := current_tournament.current_turn():
-                tournament_data["current_turn_idx"] = (
-                    current_tournament.current_turn_idx + 1
+            if current_round := current_tournament.current_round():
+                tournament_data["current_round_idx"] = (
+                    current_tournament.current_round_idx + 1
                 )
-                tournament_data["current_turn_name"] = current_turn.name
-                if current_turn.has_ended():
-                    tournament_data["current_turns_status"] = "Ended"
-                elif current_turn.has_started():
-                    tournament_data["current_turns_status"] = "Running"
+                tournament_data["current_round_name"] = current_round.name
+                if current_round.has_ended():
+                    tournament_data["current_rounds_status"] = "Ended"
+                elif current_round.has_started():
+                    tournament_data["current_rounds_status"] = "Running"
                 else:
-                    tournament_data["current_turns_status"] = "Pending"
+                    tournament_data["current_rounds_status"] = "Pending"
             return tournament_data
         else:
             return {}
@@ -276,9 +276,9 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
     def start_next_round(self):
         tournament = self._curr_tournament()
         try:
-            new_turn = tournament.start_next_turn()
+            new_round = tournament.start_next_round()
             self.tournament_repo.store_tournament(tournament)
-            self.status.notify_success(f"Round {new_turn} has started !")
+            self.status.notify_success(f"Round {new_round.name} has started !")
         except Exception as e:
             logger.error(e)
             self.status.notify_failure(f"Couldn't start next round: {e}")
@@ -293,15 +293,15 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                 else self._get_tournament(tournament_id)
             )
             round = (
-                tournament.current_turn()
+                tournament.current_round()
                 if round_idx is None
-                else tournament.turns[round_idx]
+                else tournament.rounds[round_idx]
             )
         except Exception as e:
             logger.log(e)
             self.status.notify_failure(f"Can't list matches: {e}")
             return
-        round = tournament.current_turn()
+        round = tournament.current_round()
         v = RoundView(
             cmd_manager=self.main_app, round_data=self._tournament_round_data(round)
         )
@@ -398,7 +398,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         logger.debug(f"Ending match {match_idx}")
         try:
             match_idx = int(match_idx)
-            round = tournament.current_turn()
+            round = tournament.current_round()
             if results := tournament.end_a_match(
                 match_index=match_idx, winner_id=winner_id, end_time=end_time
             ):
@@ -411,7 +411,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                         title = "Final Ranks and Scores" if tournament.has_ended() else "Current Ranks and Scores"
                         text = f"Completed: {round.name}"
                         if not tournament.has_ended():
-                            remaining_rounds = tournament.metadata.turn_count - tournament.current_turn_idx - 1
+                            remaining_rounds = tournament.metadata.round_count - tournament.current_round_idx - 1
                             text += f" ({remaining_rounds} round{"s" if remaining_rounds > 1 else ""} to go)"
                         self.main_app.receive(DisplayRankingListCommand(app=self.main_app,
                                                                         title=title,
@@ -454,9 +454,9 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         # get the round object
         try:
             round = (
-                tournament.turns[round_idx]
+                tournament.rounds[round_idx]
                 if round_idx is not None
-                else tournament.current_turn()
+                else tournament.current_round()
             )
         except Exception as e:
             logger.error(e, stack_info=True)
@@ -553,10 +553,10 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         if round_idx is None:
             # round_idx is required, prompt the user
             round_map = {}
-            for idx in range(tournament.metadata.turn_count):
-                if round := tournament.turns[idx]:
-                    round_map[idx] = tournament.turns[idx].name
-                    if idx == tournament.current_turn_idx:
+            for idx in range(tournament.metadata.round_count):
+                if round := tournament.rounds[idx]:
+                    round_map[idx] = tournament.rounds[idx].name
+                    if idx == tournament.current_round_idx:
                         round_map[idx] += "*"
             v = SelectRoundForm(cmd_manager=self.main_app,
                                 round_map=round_map,
@@ -566,7 +566,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                                                                  tournament_id=tournament.id()))
             self.main_app.view(v)
             return
-        round = tournament.turns[round_idx]
+        round = tournament.rounds[round_idx]
         v = RoundView(cmd_manager=self.main_app,
                       round_data=self._tournament_round_data(round))
         self.main_app.view(v)

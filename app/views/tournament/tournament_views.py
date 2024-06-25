@@ -182,7 +182,7 @@ class TournamentMetaEditor(BaseView):
             self.status.notify_warning(f"Keeping previous value: {data['start_date']}\n")
 
         fv = form_field(
-            field="turn_count",
+            field="round_count",
             form_data=data,
             frozen_fields=frozen_fields,
             validator="^[0-9]+$",
@@ -190,10 +190,10 @@ class TournamentMetaEditor(BaseView):
             skip_blank=True,
             display_current=True
         )
-        if fv and fv != data['turn_count']:
-            user_data['turn_count'] = fv
-        elif data['turn_count'] and 'turn_count' not in frozen_fields:
-            self.status.notify_warning(f"Keeping previous value: {data['turn_count']}\n")
+        if fv and fv != data['round_count']:
+            user_data['round_count'] = fv
+        elif data['round_count'] and 'round_count' not in frozen_fields:
+            self.status.notify_warning(f"Keeping previous value: {data['round_count']}\n")
 
         fv = form_field(
             field="description",
@@ -223,27 +223,27 @@ class TournamentDetailsView(AbstractView):
                  cmd_manager: commands_abc.CommandManagerInterface,
                  tournament_id: str,
                  status: str,
-                 turn_count: int = None,
+                 round_count: int = None,
                  participants_count: int = None,
                  location: str = None,
                  start_date: date = None,
                  end_date: date = None,
-                 current_turn_idx: int = None,
-                 current_turn_name: str = None,
-                 current_turns_status: str = None,
+                 current_round_idx: int = None,
+                 current_round_name: str = None,
+                 current_rounds_status: str = None,
                  **kwargs
                  ):
         super().__init__(cmd_manager)
         self.tournament_id = tournament_id
         self.status = status
-        self.turn_count = turn_count
+        self.round_count = round_count
         self.participants_count = participants_count
         self.location = location
         self.start_date = start_date
         self.end_date = end_date
-        self.current_turn_idx = current_turn_idx
-        self.current_turn_name = current_turn_name
-        self.current_turns_status = current_turns_status
+        self.current_round_idx = current_round_idx
+        self.current_round_name = current_round_name
+        self.current_rounds_status = current_rounds_status
 
     def render(self):
         print(self.details_template())
@@ -262,9 +262,9 @@ class TournamentDetailsView(AbstractView):
         tpl = (f"Tournament {self.tournament_id} in {self.location.strip() or "???"}{start_date_str}{end_date_str}")
         if self.participants_count:
             tpl += f"\n{self.participants_count} participants"
-        if self.current_turn_idx and self.status == "running":
-            tpl += f"\nRound {self.current_turn_idx}/{self.turn_count}"
-            tpl += f": {self.current_turn_name} ({self.current_turns_status})"
-        elif self.turn_count:
-            tpl += f"\n{self.turn_count} turns"
+        if self.current_round_idx and self.status == "running":
+            tpl += f"\nRound {self.current_round_idx}/{self.round_count}"
+            tpl += f": {self.current_round_name} ({self.current_rounds_status})"
+        elif self.round_count:
+            tpl += f"\n{self.round_count} rounds"
         return tpl
