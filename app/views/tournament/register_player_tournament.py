@@ -1,7 +1,6 @@
 from app.commands.commands_abc import CommandInterface, CommandManagerInterface
 from app.views.views_abc import AbstractView
 from app.views.player.player_views import PlayerIDPrompt, PlayerView
-from app.helpers import ansi
 from app.views.dialogs import Dialog
 
 
@@ -91,25 +90,3 @@ class ConfirmPlayerIDView(Dialog):
         self.tournament_id = tournament_id
         self.text = f"This player will be registered in tournament {self.tournament_id}:\n"
         self.text += PlayerView.player_template(self.playerdata)
-
-
-class RegisterPlayerSuccess(Dialog):
-    def __init__(
-        self,
-        cmd_manager: CommandManagerInterface,
-        player_str: str,
-        tournament_str: str,
-        confirm_cmd: CommandInterface = None,
-        abandon_cmd: CommandInterface = None,
-    ):
-        super().__init__(
-            cmd_manager=cmd_manager,
-            title=None,
-            text=None,
-            confirm_cmd=confirm_cmd,
-            abandon_cmd=abandon_cmd,
-        )
-        self.text = ansi.Formatter.format(
-            f"Player {player_str} joined tournament {tournament_str}.", ansi.Formatter.LIGHT_GREEN
-        )
-        self.text += "\nDo you wish to register another player ?"

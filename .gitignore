@@ -168,4 +168,3 @@ cython_debug/
 # Custom
 scrap/
 tests/tmp/
-data/

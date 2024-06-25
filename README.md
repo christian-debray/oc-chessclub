@@ -10,7 +10,7 @@ by the local chess club.
 
 A Chess tournament is played at a location, at a given date.
 Participants are registered with their national player ID.
-A tournament is divided in turns where each participant plays exactly 1 match against
+A tournament is divided in rounds where each participant plays exactly 1 match against
 another participant. Players are paired basing on their current score.
 
 ## Available Features
@@ -27,9 +27,9 @@ another participant. Players are paired basing on their current score.
     - edit tournament general infos
   - Run tournaments:
     - register players
-    - start turns
+    - start next round
     - record match results
-    - turn overview
+    - round overview
   - Display reports
   - Store data locally
 
@@ -105,7 +105,7 @@ The latest report for this app can be found in the `flake8_rapport/` folder.
 
   - ***Entity-Repository Pattern* for the datamodel**:
 
-     Business objects (Player, Tournament, Turn, Match, ...) are agnostic of any data storage mechanisms.
+     Business objects (Player, Tournament, Round, Match, ...) are agnostic of any data storage mechanisms.
      Data consistency and persitence is enforced by Repository objects.
 
 ### General file structure

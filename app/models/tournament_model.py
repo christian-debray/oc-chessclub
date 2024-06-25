@@ -145,15 +145,15 @@ class Match:
         }
 
 
-class Turn:
-    """A turn in a tournament."""
+class Round:
+    """A Round in a tournament."""
 
     def __init__(self, name: str = "", matches: list[Match] = None):
         self.name: str = name
         self.matches: list[Match] = matches or []
 
     def setup(self, match_list: list[tuple[Player, Player]]):
-        """Setup a turn that has not started yet.
+        """Setup a Round that has not started yet.
         Parameter is a list of pairs of players.
         """
         self.matches = []
@@ -161,7 +161,7 @@ class Turn:
             self.matches.append(Match(player1=(pair[0], 0.0), player2=(pair[1], 0.0)))
 
     def has_started(self) -> bool:
-        """A turn has started if all matches are set up."""
+        """A Round has started if all matches are set up."""
         return len(self.matches) > 0
 
     def has_ended(self) -> bool:
@@ -176,7 +176,7 @@ class Turn:
         return None
 
     def asdict(self) -> dict:
-        """Copies the data of this Turn in a new dict object.
+        """Copies the data of this Round in a new dict object.
         Useful when dumping to JSON, fo instance.
         """
         return {"name": str(self.name), "matches": [m.asdict() for m in self.matches]}
@@ -192,7 +192,7 @@ class TournamentMetaData(EntityABC):
     location: str = ""
     description: str = ""
     data_file: str = ""
-    turn_count: int = 4
+    round_count: int = 4
     status: str = "open"
 
     def set_id(self, id: Hashable):
@@ -213,7 +213,7 @@ class TournamentMetaData(EntityABC):
             "location": str(self.location),
             "description": str(self.description),
             "data_file": str(self.data_file),
-            "turn_count": self.turn_count,
+            "round_count": self.round_count,
             "status": self.status,
         }
 
@@ -223,21 +223,21 @@ class Tournament:
         self,
         metadata: TournamentMetaData,
         participants: list[Player] = None,
-        turns: list[Turn] = None,
-        current_turn: int = None,
+        rounds: list[Round] = None,
+        current_round: int = None,
     ):
         """Create a Tournament.
 
         - metadata:
         - particpants:
-        - turns:
-        - current_turn:
+        - rounds:
+        - current_round:
         """
-        if turns is not None and len(turns) != metadata.turn_count:
-            raise ValueError("Turn count mismatch.")
+        if rounds is not None and len(rounds) != metadata.round_count:
+            raise ValueError("Round count mismatch.")
         self.metadata: TournamentMetaData = metadata
-        self.turns: list[Turn] = turns or [None for _ in range(metadata.turn_count)]
-        self.current_turn_idx: int = current_turn
+        self.rounds: list[Round] = rounds or [None for _ in range(metadata.round_count)]
+        self.current_round_idx: int = current_round
         self.participants: list[Player] = participants or []
 
         # utility: keep track of oppenents met during the tournament to avoid
@@ -249,10 +249,10 @@ class Tournament:
         self.player_ranks: dict[NationalPlayerID, tuple[int, float]] = {}
 
         # update _player_opponents_data
-        for trn in self.turns:
-            if trn is None:
+        for rnd in self.rounds:
+            if rnd is None:
                 continue
-            for mtch in trn.matches:
+            for mtch in rnd.matches:
                 self._player_opponents[mtch.player1().id()].append(mtch.player2().id())
                 self._player_opponents[mtch.player2().id()].append(mtch.player1().id())
 
@@ -289,20 +289,20 @@ class Tournament:
         """Checks if a player is already registered in this tournament."""
         return player_id in self._player_opponents
 
-    def set_turns(self, turn_count: int = 4) -> bool:
-        """Sets how many turns this torunament will last (the default is 4).
+    def set_rounds(self, round_count: int = 4) -> bool:
+        """Sets how many rounds this tournament will last (the default is 4).
 
         Fails if the tournament has already started or ended.
         """
         if self.has_started():
             raise Exception(
-                "Trying to changing turn count when tournament has aldready started."
+                "Trying to changing Round count when tournament has aldready started."
             )
-        turn_count = int(turn_count)
-        if turn_count <= 0:
-            raise ValueError("Invalid turns count.")
-        self.metadata.turn_count = turn_count
-        self.turns = [None for _ in range(self.metadata.turn_count)]
+        round_count = int(round_count)
+        if round_count <= 0:
+            raise ValueError("Invalid rounds count.")
+        self.metadata.round_count = round_count
+        self.rounds = [None for _ in range(self.metadata.round_count)]
 
     def set_start_date(self, new_date: date):
         """Sets the start date. Fails if the tournament has started."""
@@ -326,11 +326,11 @@ class Tournament:
 
     def has_started(self) -> bool:
         """Return True if tournament has started."""
-        return self.turns[0] is not None and self.turns[0].has_started()
+        return self.rounds[0] is not None and self.rounds[0].has_started()
 
     def has_ended(self) -> bool:
         """Return True if tournament has ended."""
-        return self.turns[-1] is not None and self.turns[-1].has_ended()
+        return self.rounds[-1] is not None and self.rounds[-1].has_ended()
 
     def status(self) -> str:
         """Returns a string representation of this tournament's current status:
@@ -347,8 +347,8 @@ class Tournament:
     def update_end_date(self):
         """Update the end date of this tournament."""
         if self.has_ended() and self.metadata.end_date is None:
-            # find latest endtime in last turn
-            end_datetime = min([m.end_time for m in self.turns[-1].matches])
+            # find latest endtime in last Round
+            end_datetime = min([m.end_time for m in self.rounds[-1].matches])
             self.metadata.end_date = date(
                 year=end_datetime.year, month=end_datetime.month, day=end_datetime.day
             )
@@ -357,7 +357,7 @@ class Tournament:
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player"""
         total = 0.0
-        for t in self.turns:
+        for t in self.rounds:
             if t is not None and t.has_started():
                 m = t.find_player_match(player_id=player_id)
                 total += m.player_score(player_id) or 0.0
@@ -373,14 +373,12 @@ class Tournament:
             return [(p, 1, 0.0) for p in self.participants]
 
     def can_start(self) -> bool:
-        """Return True if calling the start_next_turn is valid."""
-        if self.current_turn_idx == len(self.turns) - 1:
-            # Tournament reached the last turn
+        """Return True if calling the start_next_round is valid."""
+        if self.current_round_idx == len(self.rounds) - 1:
+            # Tournament reached the last Round
             return False
-        if (self.current_turn_idx or 0) > 0 and not self.turns[
-            self.current_turn_idx
-        ].has_ended():
-            # Current turn has not ended
+        if self.current_round() is not None and not self.current_round().has_ended():
+            # Current Round has not ended
             return False
         if self.has_ended():
             # Tournament has ended.
@@ -390,57 +388,57 @@ class Tournament:
             return False
         return True
 
-    def start_next_turn(self, player_pairs: list[tuple[Player, Player]] = None) -> Turn:
-        """Fails if the current Turn is still open or if the last turn
+    def start_next_round(self, player_pairs: list[tuple[Player, Player]] = None) -> Round:
+        """Fails if the current Round is still open or if the last Round
         has started or ended.
         """
-        if self.current_turn_idx == len(self.turns) - 1:
-            raise Exception("Trying to start new turn after last turn.")
-        if (self.current_turn_idx or 0) > 0 and not self.turns[
-            self.current_turn_idx
+        if self.current_round_idx == len(self.rounds) - 1:
+            raise Exception("Trying to start new Round after last Round.")
+        if (self.current_round_idx or 0) > 0 and not self.rounds[
+            self.current_round_idx
         ].has_ended():
-            raise Exception("Trying to start new turn when current turn has not ended.")
+            raise Exception("Trying to start new Round when current Round has not ended.")
         if self.has_ended():
-            raise Exception("Trying to start new turn after tournament has ended.")
+            raise Exception("Trying to start new Round after tournament has ended.")
         if len(self.participants) % 2 > 0:
             raise ValueError("Even participant number required.")
 
-        self.current_turn_idx = (
-            self.current_turn_idx + 1 if self.current_turn_idx is not None else 0
+        self.current_round_idx = (
+            self.current_round_idx + 1 if self.current_round_idx is not None else 0
         )
 
-        # update start date with actual date where first turn got started.
-        if self.current_turn_idx == 0:
+        # update start date with actual date where first Round got started.
+        if self.current_round_idx == 0:
             self.metadata.start_date = date.today()
-        self.turns[self.current_turn_idx] = Turn(
-            name=f"Round {self.current_turn_idx + 1}"
+        self.rounds[self.current_round_idx] = Round(
+            name=f"Round {self.current_round_idx + 1}"
         )
         if player_pairs is None:
             player_pairs = self._make_player_pairs()
-        self.turns[self.current_turn_idx].setup(player_pairs)
+        self.rounds[self.current_round_idx].setup(player_pairs)
         for p1, p2 in player_pairs:
             self._player_opponents[p1.id()].append(p2.id())
             self._player_opponents[p2.id()].append(p1.id())
-        return self.current_turn()
+        return self.current_round()
 
-    def current_turn(self) -> Turn:
-        """Returns the current turn, if any.
+    def current_round(self) -> Round:
+        """Returns the current Round, if any.
         Returns None if tournament has ended or not started.
         """
         if self.has_ended() or not self.has_started():
             return None
-        return self.turns[self.current_turn_idx]
+        return self.rounds[self.current_round_idx]
 
     def pending_matches(self) -> list[tuple[int, Match]]:
         """Returns a list of pending matches and their index in the current round."""
-        if current_turn := self.current_turn():
-            if not current_turn.has_started():
+        if current_round := self.current_round():
+            if not current_round.has_started():
                 return None
-            if current_turn.has_ended():
+            if current_round.has_ended():
                 return None
             return [
                 (m, match)
-                for m, match in enumerate(current_turn.matches)
+                for m, match in enumerate(current_round.matches)
                 if not match.has_started()
             ]
         else:
@@ -450,12 +448,12 @@ class Tournament:
         """Returns True if matches are still waiting to be started
         in this tournament's current round.
         """
-        if current_turn := self.current_turn():
-            if not current_turn.has_started():
+        if current_round := self.current_round():
+            if not current_round.has_started():
                 return False
-            if current_turn.has_ended():
+            if current_round.has_ended():
                 return False
-            for m in current_turn.matches:
+            for m in current_round.matches:
                 if not m.has_started():
                     return True
         return False
@@ -464,26 +462,26 @@ class Tournament:
         """Starts a match in the current Round.
         Returns the started match if succesful, None otherwise.
         """
-        if current_turn := self.current_turn():
-            if not current_turn.has_started():
+        if current_round := self.current_round():
+            if not current_round.has_started():
                 return None
-            if current_turn.has_ended():
+            if current_round.has_ended():
                 return None
-            current_turn.matches[match_index].start(start_time=start_time)
-            return current_turn.matches[match_index]
+            current_round.matches[match_index].start(start_time=start_time)
+            return current_round.matches[match_index]
         else:
             return None
 
     def running_matches(self) -> list[tuple[int, Match]]:
         """Returns a list of pending matches and their index in the current round."""
-        if current_turn := self.current_turn():
-            if not current_turn.has_started():
+        if current_round := self.current_round():
+            if not current_round.has_started():
                 return None
-            if current_turn.has_ended():
+            if current_round.has_ended():
                 return None
             return [
                 (m, match)
-                for m, match in enumerate(current_turn.matches)
+                for m, match in enumerate(current_round.matches)
                 if (match.has_started() and not match.has_ended())
             ]
         else:
@@ -491,12 +489,12 @@ class Tournament:
 
     def has_running_matches(self) -> bool:
         """Returns True if macthes are waiting to be ended in this tournament's curren round."""
-        if current_turn := self.current_turn():
-            if not current_turn.has_started():
+        if current_round := self.current_round():
+            if not current_round.has_started():
                 return False
-            if current_turn.has_ended():
+            if current_round.has_ended():
                 return False
-            for match in current_turn.matches:
+            for match in current_round.matches:
                 if match.has_started() and not match.has_ended():
                     return True
         else:
@@ -508,12 +506,12 @@ class Tournament:
         """Ends a match in the current Round.
         Returns the result, None otherwise.
         """
-        if current_turn := self.current_turn():
-            if not current_turn.has_started():
+        if current_round := self.current_round():
+            if not current_round.has_started():
                 return None
-            if current_turn.has_ended():
+            if current_round.has_ended():
                 return None
-            match = current_turn.matches[match_index]
+            match = current_round.matches[match_index]
             result = match.end(winner=winner_id, end_time=end_time)
             self.update_end_date()
             self.update_score_board()
@@ -551,9 +549,9 @@ class Tournament:
         return self.player_ranks.get(player_id, (None, None))[0]
 
     def _make_player_pairs(self) -> list[tuple[Player, Player]]:
-        """Makes the player pairs for the next turn, basing on their current scores.
+        """Makes the player pairs for the next Round, basing on their current scores.
 
-        - Avoid repeated matches between turns.
+        - Avoid repeated matches between rounds.
         - Randomize pairs whenever possible.
         """
         if not self.has_started():
@@ -564,7 +562,7 @@ class Tournament:
                 for p in range(0, len(player_order), 2)
             ]
 
-        logger.debug(f"Making player pairs for turn {self.current_turn_idx}...")
+        logger.debug(f"Making player pairs for Round {self.current_round_idx}...")
         # we just base on ranking list to start with
         ranking_list = self.update_score_board()
         recurring_matches: list[int] = []
@@ -685,12 +683,12 @@ class Tournament:
             "tournament_id": self.id(),
             "metadata": self.metadata.asdict(),
             "participants": [str(p.id()) for p in self.participants],
-            "current_turn_idx": (
-                int(self.current_turn_idx)
-                if self.current_turn_idx is not None
+            "current_round_idx": (
+                int(self.current_round_idx)
+                if self.current_round_idx is not None
                 else None
             ),
-            "turns": [t.asdict() if t is not None else None for t in self.turns],
+            "rounds": [t.asdict() if t is not None else None for t in self.rounds],
         }
 
 
@@ -728,7 +726,7 @@ class TournamentMetaDataJSONDecoder(json.JSONDecoder):
             location=dct["location"],
             description=dct["description"],
             data_file=dct["data_file"],
-            turn_count=int(dct["turn_count"]),
+            round_count=int(dct["round_count"]),
             status=dct["status"],
         )
 
@@ -737,7 +735,7 @@ class TournamentRepository:
     """Tournament metadata is stored in data/tournaments/metadata.json,
     which stores an index of all known tournaments and the json files with tournament data.
     data/tournaments/tournament_<tournament_id>.json stores the participants,
-    turn and match data for tournament tournament_id.
+    Round and match data for tournament tournament_id.
 
     """
 
@@ -769,8 +767,8 @@ class TournamentRepository:
     def store_tournament(self, tournament: Tournament) -> bool:
         """Store a tournament.
         Tournament metadata is stored in a unique file with all other tournament metadata objects,
-        while tournament turns data is stored in separate files in the data/tournaments folder.
-        Tournament turn data files are named after the tournament id.
+        while tournament rounds data is stored in separate files in the data/tournaments folder.
+        Tournament Round data files are named after the tournament id.
         """
         if not tournament.id() or not tournament.metadata.id():
             tournament.set_id(self.gen_tournament_id())
@@ -818,34 +816,34 @@ class TournamentRepository:
             raise KeyError(
                 "Unexpected or missing tournament id while loading tournament data file."
             )
-        current_turn = (
-            int(data.get("current_turn_idx"))
-            if data.get("current_turn_idx") is not None
+        current_round = (
+            int(data.get("current_round_idx"))
+            if data.get("current_round_idx") is not None
             else None
         )
-        # otherwise, load participants and turn data:
+        # otherwise, load participants and Round data:
         participants_index = self._load_participants(data.get("participants"))
-        turns = []
-        for t in data.get("turns"):
+        rounds = []
+        for t in data.get("rounds"):
             if t is None:
-                turns.append(None)
+                rounds.append(None)
             else:
-                turns.append(
-                    self._load_turn(data=t, participants_index=participants_index)
+                rounds.append(
+                    self._load_round(data=t, participants_index=participants_index)
                 )
         self._tournament_data[tournament_id] = Tournament(
             metadata=meta,
             participants=list(participants_index.values()),
-            turns=turns,
-            current_turn=current_turn,
+            rounds=rounds,
+            current_round=current_round,
         )
         return self._tournament_data[tournament_id]
 
-    def _load_turn(self, data: dict, participants_index: dict[str, Player]):
-        """Load a turn data from a dict."""
+    def _load_round(self, data: dict, participants_index: dict[str, Player]):
+        """Load a Round data from a dict."""
         if not data:
             return None
-        turn_name = data.get("name", "")
+        round_name = data.get("name", "")
         matches_data: list[dict] = data.get("matches", [])
         matches: list[Match] = []
         for m_d in matches_data:
@@ -868,7 +866,7 @@ class TournamentRepository:
                     end_time=end_time,
                 )
             )
-        return Turn(name=turn_name, matches=matches)
+        return Round(name=round_name, matches=matches)
 
     def _load_participants(self, data: list[str]) -> dict[NationalPlayerID, Player]:
         """Load participants data from a dict."""
@@ -916,7 +914,7 @@ if __name__ == "__main__":
                 tournament_id=tournament_id,
                 start_date=date.fromisoformat("2024-01-01"),
                 location="paris",
-                turn_count=6,
+                round_count=6,
             )
         )
         logger.info("Storing Tournament data...")
@@ -932,12 +930,12 @@ if __name__ == "__main__":
         player_repo.commit_changes()
 
     if not tournament.has_started():
-        for t in range(tournament.metadata.turn_count - 1):
-            logger.debug("starting next turn...")
-            current_turn = tournament.start_next_turn()
-            print(f"starting {current_turn.name}...")
-            logger.debug(f"  turn {current_turn.name} matches:")
-            for m in current_turn.matches:
+        for t in range(tournament.metadata.round_count - 1):
+            logger.debug("starting next Round...")
+            current_round = tournament.start_next_round()
+            print(f"starting {current_round.name}...")
+            logger.debug(f"  Round {current_round.name} matches:")
+            for m in current_round.matches:
                 winner = random.choice([None, m.player1().id(), m.player2().id()])
                 logger.debug(
                     f"    playing match {m.player1().id()} vs {m.player2().id()}..."
@@ -948,15 +946,15 @@ if __name__ == "__main__":
                     end_time=datetime.fromtimestamp(m.start_time.timestamp() + 1800),
                     winner=winner,
                 )
-            logger.debug(f"Turn {current_turn.name} ended.")
+            logger.debug(f"Round {current_round.name} ended.")
             tournament.update_score_board()
             ranking = tournament.ranking_list()
             ranking.sort(key=lambda x: x[1])
             ranking_str = ", ".join(
                 [f"[{str(x[0])}: #{x[1]} ({x[2]})]" for x in ranking]
             )
-            logger.debug("Ranking after turn: ", ranking_str)
-            logger.debug("Ranking after turn:\n" + ranking_str)
+            logger.debug("Ranking after Round: ", ranking_str)
+            logger.debug("Ranking after Round:\n" + ranking_str)
             logger.debug("Write to file...")
             tournament.update_end_date()
             tournament_repo.store_tournament(tournament)
@@ -975,5 +973,5 @@ if __name__ == "__main__":
     tournament2.metadata.description = f"some random description: {utils.randstring(20)}\n\
         inserted at {datetime.now().isoformat()}"
     tournament_repo2.store_tournament(tournament2)
-    if not tournament2.current_turn().has_started():
-        tournament2.start_next_turn()
+    if not tournament2.current_round().has_started():
+        tournament2.start_next_round()

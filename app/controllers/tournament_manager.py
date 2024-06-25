@@ -12,8 +12,7 @@ from app.views.menu import Menu, MenuOption
 from app.views.tournament import tournament_views
 from app.views.tournament.register_player_tournament import (
     RegisterTournamentView,
-    ConfirmPlayerIDView,
-    RegisterPlayerSuccess
+    ConfirmPlayerIDView
 )
 from app.views.player.player_views import PlayerListView
 from app.controllers import player_manager
@@ -385,7 +384,7 @@ Please check the tournament ID and files in the tournament data folder."
         """Returns a list of fields that can't change in a tournament metadata."""
         frozen_fields = ["tournament_id", "data_file", "status", "end_date"]
         if tournament_metadata.status in ("running", "ended"):
-            frozen_fields += ["start_date", "location", "turn_count"]
+            frozen_fields += ["start_date", "location", "round_count"]
         return frozen_fields
 
     def update_tournament_meta(self, tournament_id: str, **kwargs):
@@ -403,7 +402,7 @@ Please check the tournament ID and files in the tournament data folder."
 
         frozen_fields = self._tournament_meta_frozen_fields(tournament.metadata)
         try:
-            # start_date, "location", "turn_count", "description"
+            # start_date, "location", "round_count", "description"
             if "start_date" not in frozen_fields:
                 if d_str := kwargs.get("start_date"):
                     u_start_date = date.fromisoformat(d_str)
@@ -411,9 +410,9 @@ Please check the tournament ID and files in the tournament data folder."
             if "location" not in frozen_fields:
                 u_location = kwargs.get("location")
                 tournament.set_location(u_location)
-            if "turn_count" not in frozen_fields:
-                u_turn_count = int(kwargs.get("turn_count"))
-                tournament.set_turns(u_turn_count)
+            if "round_count" not in frozen_fields:
+                u_round_count = int(kwargs.get("round_count"))
+                tournament.set_rounds(u_round_count)
             if "description" not in frozen_fields:
                 u_description = kwargs.get("description")
                 tournament.set_description(u_description)
@@ -451,19 +450,19 @@ Please check the tournament ID and files in the tournament data folder."
             self.status.notify_failure("Can't update: form data is empty.")
 
         try:
-            # start_date, "location", "turn_count", "description"
+            # start_date, "location", "round_count", "description"
             if d_str := kwargs.get("start_date"):
                 u_start_date = date.fromisoformat(d_str)
             else:
                 u_start_date = None
             u_location = kwargs.get("location") or None
-            u_turn_count = int(kwargs.get("turn_count")) or None
+            u_round_count = int(kwargs.get("round_count")) or None
             u_description = kwargs.get("description") or None
             tournament_meta = TournamentMetaData(
                 start_date=u_start_date,
                 location=u_location,
                 description=u_description,
-                turn_count=u_turn_count,
+                round_count=u_round_count,
             )
             tournament = Tournament(metadata=tournament_meta)
             if self.tournament_repo.store_tournament(tournament):
@@ -529,13 +528,10 @@ Please check the tournament ID and files in the tournament data folder."
             # display success message
             # and offer to register a new player.
             if self.tournament_repo.store_tournament(tournament=tournament):
-                v = RegisterPlayerSuccess(
-                    cmd_manager=self.main_app,
-                    player_str=str(player),
-                    tournament_str=tournament.id(),
-                    confirm_cmd=RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id())
-                )
-                self.main_app.view(v)
+                self.status.notify_success(f"Player {player} joined tournament {tournament.id()}.")
+                self.main_app.receive(RegisterPlayerCommand(
+                        app=self.main_app,
+                        tournament_id=tournament.id()))
                 return
         except Exception as e:
             logger.error(f"Failed to update tournament after registering player: {e}")
