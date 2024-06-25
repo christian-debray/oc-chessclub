@@ -4,6 +4,8 @@
 import re
 from datetime import date, datetime
 import time
+from pathlib import Path
+import os
 
 
 def is_valid_name(val: str):
@@ -55,4 +57,23 @@ def is_valid_datetime(val: str) -> bool:
         datetime.fromisoformat(val)
         return True
     except ValueError:
+        return False
+
+
+def is_writable_path(val: str, is_real_file: bool = True) -> bool:
+    """Returns True if path is writable.
+    Also checks if file is a real file."""
+    try:
+        p = Path(val).resolve()
+        if is_real_file and p.is_dir():
+            return False
+        if p.exists():
+            return os.access(p, os.W_OK)
+        else:
+            while not p.exists():
+                p = p.parent
+                if not p:
+                    return False
+            return os.access(p, os.W_OK)
+    except Exception:
         return False
