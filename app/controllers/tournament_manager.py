@@ -12,8 +12,7 @@ from app.views.menu import Menu, MenuOption
 from app.views.tournament import tournament_views
 from app.views.tournament.register_player_tournament import (
     RegisterTournamentView,
-    ConfirmPlayerIDView,
-    RegisterPlayerSuccess
+    ConfirmPlayerIDView
 )
 from app.views.player.player_views import PlayerListView
 from app.controllers import player_manager
@@ -529,13 +528,10 @@ Please check the tournament ID and files in the tournament data folder."
             # display success message
             # and offer to register a new player.
             if self.tournament_repo.store_tournament(tournament=tournament):
-                v = RegisterPlayerSuccess(
-                    cmd_manager=self.main_app,
-                    player_str=str(player),
-                    tournament_str=tournament.id(),
-                    confirm_cmd=RegisterPlayerCommand(app=self.main_app, tournament_id=tournament.id())
-                )
-                self.main_app.view(v)
+                self.status.notify_success(f"Player {player} joined tournament {tournament.id()}.")
+                self.main_app.receive(RegisterPlayerCommand(
+                        app=self.main_app,
+                        tournament_id=tournament.id()))
                 return
         except Exception as e:
             logger.error(f"Failed to update tournament after registering player: {e}")

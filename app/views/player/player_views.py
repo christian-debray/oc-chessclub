@@ -177,24 +177,10 @@ class PlayerIDPrompt(AbstractView):
             elif self.confirm_cmd:
                 self.confirm_cmd.set_command_params(player_id=val)
                 self.issuecmd(self.confirm_cmd)
+                return
         elif self.cancel_cmd:
             self.issuecmd(self.cancel_cmd)
-        self.prompt += "\n<Ctrl> + 'D' to abandon"
-        if self.list_cmd:
-            shortcuts = {self.list_key: self.list_key}
-            self.prompt += f"\n'{self.list_key}' + <Enter> to list players"
-        else:
-            shortcuts = {}
-        self.prompt += "\nPlayer ID > "
-        val = self.getinput(prompt=self.prompt, shortcuts=shortcuts)
-        if val is not None:
-            if val == self.list_key:
-                self.issuecmd(self.list_cmd)
-            elif self.confirm_cmd:
-                self.confirm_cmd.set_command_params(player_id=val)
-                self.issuecmd(self.confirm_cmd)
-        elif self.cancel_cmd:
-            self.issuecmd(self.cancel_cmd)
+            return
 
     @staticmethod
     def getinput(prompt, shortcuts: dict[str, str] = None):
