@@ -50,7 +50,9 @@ class BaseView(AbstractView):
         else:
             print("\n")
         if self.title:
-            print(f"*** {self.title.upper()} ***\n")
+            title_str = f"*** {self.title.upper()} ***"
+            print(title_str)
+            print("="*len(title_str) + "\n")
         if self.text:
             print(self.text)
 
