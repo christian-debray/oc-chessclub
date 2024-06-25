@@ -21,15 +21,15 @@ from app.controllers import (
 )
 from app.helpers.validation import is_valid_date, is_valid_datetime
 from datetime import date, datetime
-
-# from app.controllers.tournament_manager import TournamentManager
-# from app.controllers.running_tournament_manager import RunningTournamentManager
+import argparse
 
 logger = logging.getLogger()
 
 
 @dataclass
 class AppConfig:
+    """Store all global config variables as class variables of teh AppConfig class."""
+
     player_repository_file: Path = field(default=Path(app.DATADIR, "players.json"))
     tournament_data_dir: Path = field(default=Path(app.DATADIR, "tournaments"))
     tournament_repository_file: Path = field(
@@ -38,7 +38,8 @@ class AppConfig:
 
 
 class AssetLoader:
-    """Helper class used to instanciate controllers and repositories."""
+    """Helper class used to instanciate controllers and repositories.
+    This is used by the main controller's launch() method."""
 
     def __init__(self, cfg: AppConfig, app: MainController):
         self._cfg = cfg
@@ -116,6 +117,11 @@ class AssetLoader:
 
 
 class MainMenuCommand(CommandInterface):
+    """Command to display the Main menu.
+
+    See the commands_abc module and the main controller's receive() and main() methods.
+    """
+
     def __init__(self, app: MainController, cycle: bool | int = False) -> None:
         super().__init__(cycle)
         self.app = app
@@ -321,7 +327,9 @@ class MainController(MainController):
                     for p in params:
                         d_str = str(params[p])
                         if is_valid_date(d_str):
-                            logger.debug(f"try to decode date: {d_str} ({type(d_str).__name__})")
+                            logger.debug(
+                                f"try to decode date: {d_str} ({type(d_str).__name__})"
+                            )
                             params[p] = date.fromisoformat(d_str)
                         elif is_valid_datetime(d_str):
                             logger.debug(f"try to decode datetime: {d_str}")
@@ -383,16 +391,46 @@ class MainController(MainController):
 
 
 if __name__ == "__main__":
-    logfile = Path(app.APPDIR, "debug.log")
-    logging.basicConfig(filename=logfile, level=logging.DEBUG)
-    chessApp = MainController()
-    import argparse
+    # Set up command line arguments
+    #
     parser = argparse.ArgumentParser("chessclub_app")
     parser.add_argument("--script", help="Execute a sequence of commands from a file")
+    parser.add_argument(
+        "--debug",
+        "-D",
+        const=logging.DEBUG,
+        action="store_const",
+        help="Set logger debugging level to DEBUG.",
+    )
+    parser.add_argument(
+        "--log",
+        default="logs/debug.log",
+        help="Set the logfile path. Defaults to logs/debug.log. Set to 0 or empty string to disable logging."
+    )
     args = parser.parse_args()
     script = None
     if args.script:
         script_path = Path(args.script)
         with open(script_path) as sf:
             script = sf.readlines()
+
+    # setup logging: write logs to logs/debug.log
+    #
+    if args.log:
+        logfile = Path(app.APPDIR.parent, args.log)
+    else:
+        logfile = None
+
+    if logfile is not None:
+        loglvl = logging.ERROR
+        if not logfile.exists():
+            if not logfile.parent.exists():
+                logfile.parent.mkdir(mode=0o777)
+        if args.debug:
+            loglvl = logging.DEBUG
+        logging.basicConfig(filename=logfile, level=loglvl)
+
+    # now launch the app
+    #
+    chessApp = MainController()
     chessApp.main(cmd_script=script)

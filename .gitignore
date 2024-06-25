@@ -168,3 +168,5 @@ cython_debug/
 # Custom
 scrap/
 tests/tmp/
+logs/
+tmp/

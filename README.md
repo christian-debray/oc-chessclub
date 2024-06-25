@@ -61,6 +61,14 @@ After having started the python virtual environment, simply invoke the main scri
 
 The menus displayed by the app will guide you through the different features and processes.
 
+The app also accepts some command line arguments to record detailed debugging logs and run automation scripts.
+
+More info:
+
+```
+  python main.py -h
+```
+
 ## Data files
 
 The app stores its data in the `data/` folder, in JSON format. This repo contains some sample data:
