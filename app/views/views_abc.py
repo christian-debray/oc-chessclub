@@ -5,6 +5,12 @@ from app.commands.commands_abc import (
     CommandInterface,
 )
 from app.helpers import text_ui
+from pathlib import Path
+import sys
+from contextlib import AbstractContextManager
+import logging
+
+logger = logging.getLogger()
 
 
 class AbstractView(CommandIssuer):
@@ -50,7 +56,9 @@ class BaseView(AbstractView):
         else:
             print("\n")
         if self.title:
-            print(f"*** {self.title.upper()} ***\n")
+            title_str = f"*** {self.title.upper()} ***"
+            print(title_str)
+            print("="*len(title_str) + "\n")
         if self.text:
             print(self.text)
 
@@ -87,3 +95,33 @@ class SimpleView(BaseView):
 
         if self.command:
             self.issuecmd(self.command)
+
+
+class RenderToFileContext(AbstractContextManager):
+    """Redirects output to a file
+    """
+    def __init__(self, ofile: Path = None, encoding="utf8"):
+        self.ofile: Path = Path(ofile)
+        self._o_handle = None
+        self._o_encoding = encoding
+        self._stdout_bck = None
+
+    def __enter__(self):
+        if self.ofile:
+            logger.debug(f"Enter Write Context: redirect stdout to file: {self.ofile}")
+            if not self.ofile.exists():
+                if not self.ofile.parent.exists():
+                    self.ofile.parent.mkdir(mode=0o777, parents=True, exist_ok=True)
+                self.ofile.touch(mode=0o666)
+            self._o_handle = open(self.ofile, mode="w", encoding=self._o_encoding)
+            self._stdout_bck = sys.stdout
+            sys.stdout = self._o_handle
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        logger.debug("Exit write context")
+        try:
+            self._o_handle.close()
+        finally:
+            sys.stdout = self._stdout_bck
+        return False

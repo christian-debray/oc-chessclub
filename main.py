@@ -14,7 +14,14 @@ from app.views.menu import MenuOption, Menu
 from app.models.player_model import PlayerRepository
 from app.controllers.player_manager import PlayerManager
 from app.models.tournament_model import TournamentRepository
-from app.controllers import tournament_manager, running_tournament_manager
+from app.controllers import (
+    tournament_manager,
+    running_tournament_manager,
+    reports_manager,
+)
+from app.helpers.validation import is_valid_date, is_valid_datetime
+from datetime import date, datetime
+
 # from app.controllers.tournament_manager import TournamentManager
 # from app.controllers.running_tournament_manager import RunningTournamentManager
 
@@ -57,6 +64,8 @@ class AssetLoader:
                 return self.load_tournament_manager()
             case running_tournament_manager.RunningTournamentManager.__name__:
                 return self.load_running_tournament_manager()
+            case reports_manager.ReportsManager.__name__:
+                return self.load_reports_manager()
         raise ValueError(f"Failed to load instance of unknown class {cls_n}.")
 
     def load_player_repository(self) -> PlayerRepository:
@@ -84,14 +93,26 @@ class AssetLoader:
             )
         return self.tournament_manager
 
-    def load_running_tournament_manager(self) -> running_tournament_manager.RunningTournamentManager:
+    def load_running_tournament_manager(
+        self,
+    ) -> running_tournament_manager.RunningTournamentManager:
         if not self.running_tournament_manager:
-            self.running_tournament_manager = running_tournament_manager.RunningTournamentManager(
-                player_repo=self.load_player_repository(),
-                tournament_repo=self.load_tournament_repository(),
-                main_app=self.app,
+            self.running_tournament_manager = (
+                running_tournament_manager.RunningTournamentManager(
+                    player_repo=self.load_player_repository(),
+                    tournament_repo=self.load_tournament_repository(),
+                    main_app=self.app,
+                )
             )
         return self.running_tournament_manager
+
+    def load_reports_manager(self) -> reports_manager.ReportsManager:
+        instance = reports_manager.ReportsManager(
+            player_repo=self.player_repo,
+            tournament_repo=self.tournament_repo,
+            main_app=self.app,
+        )
+        return instance
 
 
 class MainMenuCommand(CommandInterface):
@@ -200,19 +221,30 @@ class MainController(MainController):
                 command=tournament_manager.LoadTournamentCommand(
                     app=self,
                     confirm_cmd=commands.LaunchManagerCommand(
-                        app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
-                    ))
+                        app=self,
+                        cls_or_obj=running_tournament_manager.RunningTournamentManager,
+                    ),
+                ),
             )
         )
-        if self.get_state('current_tournament_id'):
+        if self.get_state("current_tournament_id"):
             menu_view.add_option(
                 MenuOption(
                     option_text="Run Current Tournament",
                     command=commands.LaunchManagerCommand(
-                        app=self, cls_or_obj=running_tournament_manager.RunningTournamentManager
-                    )
+                        app=self,
+                        cls_or_obj=running_tournament_manager.RunningTournamentManager,
+                    ),
                 )
             )
+        menu_view.add_option(
+            MenuOption(
+                option_text="Reports",
+                command=commands.LaunchManagerCommand(
+                    app=self, cls_or_obj=reports_manager.ReportsManager
+                ),
+            )
+        )
         menu_view.add_option(
             MenuOption(
                 option_text="Exit", alt_key="X", command=ExitCurrentCommand(self)
@@ -274,10 +306,26 @@ class MainController(MainController):
             line = 0
             for cmd_str in cmd_list:
                 line += 1
+                cmd_str = cmd_str.strip()
+                if len(cmd_str) == 0:
+                    # blank line
+                    continue
+                if cmd_str[0] == "#":
+                    # comment
+                    continue
                 cls_n = cmd_str[: cmd_str.index(".")]
                 method_n = cmd_str[cmd_str.index(".") + 1: cmd_str.index("(")]
                 if param_json := cmd_str[cmd_str.index("(") + 1: cmd_str.index(")")]:
-                    params = json.loads(param_json)
+                    params: dict = json.loads(param_json)
+                    logger.debug(f"decoded params: {params}")
+                    for p in params:
+                        d_str = str(params[p])
+                        if is_valid_date(d_str):
+                            logger.debug(f"try to decode date: {d_str} ({type(d_str).__name__})")
+                            params[p] = date.fromisoformat(d_str)
+                        elif is_valid_datetime(d_str):
+                            logger.debug(f"try to decode datetime: {d_str}")
+                            params[p] = datetime.fromisoformat(d_str)
                 else:
                     params = {}
                 script.append(
@@ -338,4 +386,13 @@ if __name__ == "__main__":
     logfile = Path(app.APPDIR, "debug.log")
     logging.basicConfig(filename=logfile, level=logging.DEBUG)
     chessApp = MainController()
-    chessApp.main()
+    import argparse
+    parser = argparse.ArgumentParser("chessclub_app")
+    parser.add_argument("--script", help="Execute a sequence of commands from a file")
+    args = parser.parse_args()
+    script = None
+    if args.script:
+        script_path = Path(args.script)
+        with open(script_path) as sf:
+            script = sf.readlines()
+    chessApp.main(cmd_script=script)

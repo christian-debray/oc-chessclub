@@ -3,7 +3,7 @@ from app.commands import commands
 from app.commands.commands_abc import CommandInterface
 from app.controllers.controller_abc import MainController
 from app.models.player_model import PlayerRepository
-from app.models.tournament_model import TournamentRepository, Round, Match
+from app.models.tournament_model import TournamentRepository, Match
 from app.controllers import tournament_manager
 from app.views.menu import Menu, MenuOption
 from app.views.tournament.running_tournament import (
@@ -307,30 +307,6 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         )
         self.main_app.view(v)
 
-    def _match_data(self, match_list: list[tuple[int, Match]]):
-        """returns a view of a list of matches as a dict,
-        indexed by the matches index."""
-        matches_data = {}
-        for m, m_details in match_list:
-            matches_data[m] = {
-                "idx": m,
-                "player1": m_details.player1().asdict(),
-                "player2": m_details.player2().asdict(),
-                "score_player1": m_details.player_score(m_details.player1().id()),
-                "score_player2": m_details.player_score(m_details.player2().id()),
-                "start_time": m_details.start_time,
-                "end_time": m_details.end_time,
-            }
-        return matches_data
-
-    def _tournament_round_data(self, round: Round) -> dict:
-        """Returns a dict containing a round's data"""
-        round_data = {
-            "name": round.name,
-            "matches": self._match_data(enumerate(round.matches)),
-        }
-        return round_data
-
     def start_match(
         self,
         match_idx: int = None,
@@ -399,13 +375,18 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
         try:
             match_idx = int(match_idx)
             round = tournament.current_round()
+            # winner_id might be a code used in scripts
+            if winner_id == "_player1_":
+                winner_id = round.matches[match_idx].player1().id()
+            elif winner_id == "_player2_":
+                winner_id = round.matches[match_idx].player2().id()
             if results := tournament.end_a_match(
                 match_index=match_idx, winner_id=winner_id, end_time=end_time
             ):
                 if self.tournament_repo.store_tournament(tournament):
-                    success_str = f"Ended match {match_idx+1}:\n"
-                    success_str += f"\n {results[0][0]}: {results[0][1]}"
-                    success_str += f"\n {results[1][0]}: {results[1][1]}"
+                    success_str = f"Ended match {match_idx+1}:"
+                    success_str += f"\n  {results[0][0]}: {results[0][1]}"
+                    success_str += f"\n  {results[1][0]}: {results[1][1]}\n"
                     self.status.notify_success(success_str)
                     if round.has_ended():
                         title = "Final Ranks and Scores" if tournament.has_ended() else "Current Ranks and Scores"
