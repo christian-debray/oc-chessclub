@@ -1,33 +1,33 @@
 from app.commands.commands_abc import CommandManagerInterface
-from app.views.views_abc import AbstractView
-from yattag import Doc, indent, SimpleDoc
+from yattag import Doc, indent
+from app.views.html.base_html import HTMLBaseView
 from app.helpers.string_formatters import formatdate
 
 
-class TournamentInfoHTML(AbstractView):
+class TournamentInfoHTML(HTMLBaseView):
     """Render tournament infos as HTML"""
     def __init__(self,
                  tournament_data: dict,
                  title: str = None,
-                 cmd_manager: CommandManagerInterface = None):
+                 cmd_manager: CommandManagerInterface = None,
+                 standalone: bool = False):
         super().__init__(cmd_manager=cmd_manager)
         self.tournament_data = tournament_data
         self.title = title
+        self.standalone = standalone
 
     def render(self):
-        markup: SimpleDoc = self.tournament_view_tpl(self.tournament_data)
-        if not self.title:
-            print(indent(markup.getvalue()))
+        title_tag = "h1" if self.standalone else "h2"
+        markup = self.tournament_view_tpl(self.tournament_data, self.title, title_tag)
+        if not self.standalone:
+            print(indent(markup))
         else:
-            doc, tag, text, line = Doc().ttl()
-            with tag("div"):
-                line("h2", self.title)
-                doc.asis(markup.getvalue())
-            print(indent(doc.getvalue()))
+            print(self.document(markup))
 
     @staticmethod
-    def tournament_view_tpl(data: dict) -> SimpleDoc:
-
+    def tournament_view_tpl(data: dict, title: str = None, title_tag: str = "h1") -> str:
+        """Returns the tournament data as an HTML5 list
+        """
         start_date_tpl = formatdate(d=data.get("start_date"), fmt="%d/%m/%Y", empty="")
         end_date_tpl = formatdate(d=data.get("end_date"), fmt="%d/%m/%Y", empty="")
         dates_tpl = ""
@@ -54,9 +54,11 @@ class TournamentInfoHTML(AbstractView):
             ("Description", data.get("description"))
         ]
         doc, tag, text, line = Doc().ttl()
+        if title:
+            doc.line(tag_name=title_tag, text_content=title)
         with tag("ul"):
             for dt, dd in list_data:
                 with tag("li"):
                     line("strong", f"{dt}:")
                     text(f" {dd}")
-        return doc
+        return doc.getvalue()
