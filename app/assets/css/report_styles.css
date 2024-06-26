@@ -1,0 +1,53 @@
+body {
+    font-family: "Arial", "Helvetica", sans-serif;
+    font-size: 12pt
+}
+
+h1,
+h2,
+h3 {
+    color: #993300;
+    margin-top: 36pt
+}
+
+h2 {
+    background-color: #990000;
+    color: white;
+    padding: 6pt
+}
+
+div {
+    margin-top: 12pt;
+    margin-bottom: 12pt
+}
+
+table {
+    margin: 12pt;
+    padding: 6pt;
+    border-collapse: collapse;
+}
+
+th {
+    background-color: #FF6600;
+    padding: 12pt;
+    border: solid 1px #993300
+}
+
+td {
+    padding: 6pt;
+    border: solid 1px lightgrey
+}
+
+table caption {
+    font-style: italic;
+    margin-bottom: 6pt
+}
+
+footer {
+    margin-top: 36pt;
+    margin-bottom: 24pt;
+    font-style: italic;
+    color: #AAA;
+    border-top: solid 1px #AAA;
+    padding: 6pt 3pt
+}

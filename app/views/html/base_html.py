@@ -2,6 +2,8 @@ from app.commands.commands_abc import CommandManagerInterface
 from app.views.views_abc import AbstractView
 from yattag import Doc, indent
 from abc import abstractmethod
+from datetime import datetime
+from app.helpers.string_formatters import formatdate
 
 
 class HTMLBaseView(AbstractView):
@@ -16,6 +18,7 @@ class HTMLBaseView(AbstractView):
         self.lang = "en"
         self.doctype: str = "<!DOCTYPE html>"
         self.stylesheets_links: list[str] = []
+        self.generated_date = datetime.now()
 
     @abstractmethod
     def render(self):
@@ -38,6 +41,9 @@ class HTMLBaseView(AbstractView):
                 doc.stag("link", rel="stylesheet", href=css_link)
             with tag("body"):
                 doc.asis(content)
+                if self.generated_date:
+                    with tag("footer"):
+                        line("p", f"Report generated on {formatdate(self.generated_date, "%d/%m/%Y at %H:%M:%S")}")
         if pretty_print:
             return indent(doc.getvalue())
         else:

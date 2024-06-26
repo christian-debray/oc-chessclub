@@ -12,6 +12,7 @@ from app.models.tournament_model import TournamentRepository
 from app.controllers import player_manager, tournament_manager
 from app.views.reports.tournament_reports import TournamentReportView, ExportToHTMLDialog
 from app.views.html.reports import html_reports
+from app.views.html.base_html import HTMLBaseView
 from pathlib import Path
 import logging
 
@@ -208,6 +209,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                     cmd_manager=self.main_app,
                     standalone=True
                 )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
                 with RenderToFileContext(ofile=Path(export_to)):
                     v.render()
                 self.status.notify_success(f"Wrote report to {export_to}")
@@ -245,6 +248,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                     cmd_manager=self.main_app,
                     standalone=True
                 )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
                 with RenderToFileContext(ofile=Path(export_to)):
                     v.render()
                 self.status.notify_success(f"Wrote report to {export_to}")
@@ -292,6 +297,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                     cmd_manager=self.main_app,
                     standalone=True
                 )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
                 with RenderToFileContext(ofile=Path(export_to)):
                     v.render()
                 self.status.notify_success(f"Wrote report to {export_to}")
@@ -344,6 +351,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                     cmd_manager=self.main_app,
                     standalone=True
                 )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
                 with RenderToFileContext(ofile=Path(export_to)):
                     v.render()
                 self.status.notify_success(f"Wrote report to {export_to}")
@@ -412,6 +421,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                     cmd_manager=self.main_app,
                     standalone=True
                 )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
                 with RenderToFileContext(ofile=Path(export_to)):
                     v.render()
                 self.status.notify_success(f"Wrote report to {export_to}")
@@ -432,3 +443,36 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                 ))
             v = TournamentReportView(tournament_data=tournament_data)
             self.main_app.view(v)
+
+    def _set_html_view_css(self, view: HTMLBaseView, dest_view_path: Path) -> bool:
+        """Adds a link to a css stylesheet in a view, and exports the css
+        file to the folder where the view should be exported.
+        """
+        if not dest_view_path:
+            return False
+        try:
+            if not isinstance(dest_view_path, Path):
+                dest_view_path = Path(dest_view_path)
+            css_file: Path = Path(self.main_app.get_config('report_css_file'))
+            if not css_file or not css_file.exists():
+                return
+            exported_css_file_abs = Path(dest_view_path.parent, css_file.name).resolve()
+            #
+            # try to copy the css file to the destination path
+            #
+            if not exported_css_file_abs.exists():
+                if not exported_css_file_abs.parent.exists():
+                    exported_css_file_abs.parent.mkdir(mode=0o777)
+                exported_css_file_abs.touch(mode=0o666)
+
+            with open(css_file, "r", encoding="utf8") as orig_f:
+                with open(exported_css_file_abs, "w", encoding="utf8") as dest_f:
+                    dest_f.write(orig_f.read())
+            #
+            # prefer a relative path in the final HTML link
+            #
+            view.stylesheets_links.append(css_file.name)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to export css file: {e}", stack_info=True)
+        return False

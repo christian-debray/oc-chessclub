@@ -35,6 +35,9 @@ class AppConfig:
     tournament_repository_file: Path = field(
         default=Path(app.DATADIR, "tournaments", "tournament_index.json")
     )
+    report_css_file: Path = field(
+        default=Path(app.APPDIR, "assets", "css", "report_styles.css")
+    )
 
 
 class AssetLoader:
@@ -161,6 +164,12 @@ class MainController(MainController):
     def clear_state(self, key: str):
         if key in self._state:
             del self._state[key]
+
+    def get_config(self, key: str):
+        if hasattr(self._config, key):
+            return getattr(self._config, key)
+        else:
+            return None
 
     def receive(self, *command: CommandInterface):
         """Receive one or more commands and add them to the command stack.
