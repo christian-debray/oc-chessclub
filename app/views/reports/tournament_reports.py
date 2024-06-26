@@ -2,7 +2,7 @@ from app.views.views_abc import BaseView, CommandManagerInterface
 from app.views import dialogs
 from app.views.tournament.running_tournament import RoundView
 from app.views.tournament.tournament_views import TournamentInfoView
-from app.helpers.text_ui import prompt_v
+from app.helpers.text_ui import prompt_v, format_table
 from pathlib import Path
 from app.helpers.validation import is_writable_path
 
@@ -53,6 +53,21 @@ class TournamentReportView(BaseView):
         super().render()
         if metadata := self.tournament_data.get("metadata"):
             print(TournamentInfoView.tournament_view_tpl(data=metadata))
+        #
+        # particpants ranking list
+        #
+        ranking_list: list[tuple] = self.tournament_data.get("ranking_list")
+        if ranking_list:
+            print("\nParticipants and rankings")
+            print("===========================\n")
+
+            table_data = [["Rank", "Participant", "Score"]]
+            for player_rank, player, player_score in ranking_list:
+                player_tpl = f"{player.get("surname").upper()} {player.get("name").capitalize()}\n"
+                player_tpl += f"{player.get("national_player_id")}"
+                table_data.append([str(player_rank), player_tpl, str(player_score)])
+            print(format_table(table_data))
+
         rounds: list[dict] = self.tournament_data.get("rounds", [])
         if len(rounds) > 0:
             print("\nRound details")
