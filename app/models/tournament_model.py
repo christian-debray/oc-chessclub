@@ -181,6 +181,17 @@ class Round:
         """
         return {"name": str(self.name), "matches": [m.asdict() for m in self.matches]}
 
+    def latest_end_time(self) -> datetime:
+        """Returns the date and time where the last running match of this round ended.
+        """
+        if not self.has_started():
+            return None
+        end_times = [m.end_time for m in self.matches if m.has_ended()]
+        if end_times:
+            return max(end_times)
+        else:
+            return None
+
 
 @dataclass
 class TournamentMetaData(EntityABC):
@@ -461,12 +472,17 @@ class Tournament:
     def start_a_match(self, match_index: int, start_time: datetime = None) -> Match:
         """Starts a match in the current Round.
         Returns the started match if succesful, None otherwise.
+
+        Fails if start_time is inconsistent with other tournament dates and times:
+        - start times of round n+1 must be greater than all end_times of round n.
         """
         if current_round := self.current_round():
             if not current_round.has_started():
-                return None
+                raise Exception("No matches are set up in this round.")
             if current_round.has_ended():
-                return None
+                raise Exception("Current round has already ended.")
+            if self.current_round_idx > 0 and start_time < self.rounds[self.current_round_idx-1].latest_end_time():
+                raise ValueError("Invalid start_time (should be greater than latest end time in previous round).")
             current_round.matches[match_index].start(start_time=start_time)
             #
             # if the tournament just started, also update the start date
@@ -476,7 +492,7 @@ class Tournament:
                     self.metadata.start_date = date.fromisoformat(start_time.strftime("%Y-%m-%d"))
             return current_round.matches[match_index]
         else:
-            return None
+            raise Exception("No current running round.")
 
     def running_matches(self) -> list[tuple[int, Match]]:
         """Returns a list of pending matches and their index in the current round."""
@@ -511,6 +527,8 @@ class Tournament:
     ) -> tuple[tuple[Player, float], tuple[Player, float]]:
         """Ends a match in the current Round.
         Returns the result, None otherwise.
+
+        Fails if end_time is inconsistent or winner_id is unknown.
         """
         if current_round := self.current_round():
             if not current_round.has_started():
