@@ -1,5 +1,16 @@
 [flake8]
 max_line_length = 119
 statistics = True
+exclude =
+    __pycache__,
+    tests/tmp/,
+    data/,
+    demo/,
+    logs/,
+    .env,
+    flake8_rapport/,
+    .git,
+    .vscode
+filename = *.py
 format = html
 htmldir = flake8_rapport/

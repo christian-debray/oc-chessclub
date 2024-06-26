@@ -106,6 +106,14 @@ The python code of this app is compliant with PEP8 Style guide.
 Compliance with the PEP8 style guide is enforced using Flake8: https://flake8.pycqa.org/en/latest/.
 The latest report for this app can be found in the `flake8_rapport/` folder.
 
+To check PEP 8 compliance of the current code, you can use the .flake8 configuration file
+provided with this package:
+
+```
+flake8 -v
+```
+
+
  ### Design Patterns
 
  The app's architecture follows these patterns:
