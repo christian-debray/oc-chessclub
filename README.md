@@ -79,6 +79,8 @@ To run a tournament, load it as the current tournament, using the options in the
 Reports accessible from the Reports menu can also be exported to HTML files.
 When viewing a report, the user can set a destination path for the rendered HTML file.
 
+**sample reports** Some sample reports can be found in the `demo/reports` folder.
+
 ## Data files
 
 The app stores its data in the `data/` folder, in JSON format. This repo contains some sample data:
@@ -167,7 +169,7 @@ flake8 -v
   |  +-- players.json
   |  +-- tournaments/ (tournament json files, including tournament index)
   |   
-  +--+ demo/ (demo scripts folder)
+  +--+ demo/ (app demonstration stuff: automation scripts and reports)
   |
   +-- flake8_rapport/
   |
