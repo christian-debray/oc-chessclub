@@ -24,6 +24,7 @@ another participant. At each round, players are paired basing on their current r
   - **Manage tournament data:** tournament creation, add participants, edit infos
   - **Run tournaments:** start rounds, manage matches, display ranking lists
   - **Display reports:** display reports on registered players and tournaments
+  - **Export reports to HTML:** reports can be exported as HTML files to the local file system.
   - **Store data locally:** All data handled by the app is stored to the local file system in JSON format, in a data folder.
 
 ## Installing the app
@@ -68,6 +69,15 @@ More info:
 ```
   python main.py -h
 ```
+
+### Running a tournament
+
+To run a tournament, load it as the current tournament, using the options in the main menu or the tournament manager menu.
+
+### Exporting reports
+
+Reports accessible from the Reports menu can also be exported to HTML files.
+When viewing a report, the user can set a destination path for the rendered HTML file.
 
 ## Data files
 
