@@ -76,7 +76,9 @@ class utils:
         return matches
 
     @staticmethod
-    def make_tournament_metadata(rounds: int = 4) -> tournament_model.TournamentMetaData:
+    def make_tournament_metadata(
+        rounds: int = 4,
+    ) -> tournament_model.TournamentMetaData:
         return tournament_model.TournamentMetaData(
             tournament_id=utils.randstring(5),
             start_date=date.fromisoformat("2024-05-02"),
@@ -98,6 +100,18 @@ class utils:
         for m in match_list:
             tournament.participants.append(m.player1())
             tournament.participants.append(m.player2())
+        return tournament
+
+    @staticmethod
+    def make_tournament_not_started(
+        player_count: int = 10, round_count: int = 4
+    ) -> tournament_model.Tournament:
+        torunament_meta = utils.make_tournament_metadata()
+        torunament_meta.round_count = round_count
+        players = [utils.make_random_player() for _ in range(player_count)]
+        tournament = tournament_model.Tournament(
+            metadata=torunament_meta, participants=players
+        )
         return tournament
 
 
@@ -162,7 +176,9 @@ class TestTournamentJSON(unittest.TestCase):
                 self.assertEqual(
                     dict_match_m_players[p][0], round_match_m.players[p][0].id()
                 )
-                self.assertEqual(dict_match_m_players[p][1], round_match_m.players[p][1])
+                self.assertEqual(
+                    dict_match_m_players[p][1], round_match_m.players[p][1]
+                )
 
     def test_tournament_asdict(self):
         """Export tournament data to a dict object."""
@@ -314,7 +330,7 @@ class TestMatch(unittest.TestCase):
         self.assertEqual(match.scores(), ((p1, 1.0), (p2, 0.0)))
 
 
-class TestTurn(unittest.TestCase):
+class TestRound(unittest.TestCase):
     """Test the Round class"""
 
     def test_round_setup(self):
@@ -347,6 +363,34 @@ class TestTurn(unittest.TestCase):
         self.assertEqual(m, Round.matches[4])
         self.assertEqual(m.player2(), player)
 
+    def test_round_latest_time(self):
+        """Round.latest_time() returns None when no match has ended or started
+        otherwise the latest end time of all ended matches"""
+        round = tournament_model.Round("a Round")
+        player_pairs = [
+            (utils.make_random_player(), utils.make_random_player()) for _ in range(10)
+        ]
+        self.assertIsNone(round.latest_end_time())
+        # setup and start matches
+        round.setup(player_pairs)
+        round.matches[0].start(start_time=datetime.fromisoformat("2024-06-01T12:00:00"))
+        round.matches[1].start(start_time=datetime.fromisoformat("2024-06-01T12:00:00"))
+        round.matches[2].start(start_time=datetime.fromisoformat("2024-06-01T12:00:00"))
+        round.matches[3].start(start_time=datetime.fromisoformat("2024-06-01T12:00:00"))
+        round.matches[4].start(start_time=datetime.fromisoformat("2024-06-01T12:00:00"))
+
+        self.assertIsNone(round.latest_end_time())
+        # end matches
+        round.matches[0].end(
+            winner=None, end_time=datetime.fromisoformat("2024-06-01T12:30:00")
+        )
+        round.matches[1].end(
+            winner=None, end_time=datetime.fromisoformat("2024-06-01T12:15:00")
+        )
+        self.assertEqual(
+            round.latest_end_time(), datetime.fromisoformat("2024-06-01T12:30:00")
+        )
+
 
 class TestTournament(unittest.TestCase):
     """Test the tournament class."""
@@ -370,13 +414,13 @@ class TestTournament(unittest.TestCase):
             metadata=utils.make_tournament_metadata()
         )
         player = utils.make_random_player()
-        player.set_id('FR12345')
-        self.assertEqual(player.id(), 'FR12345')
+        player.set_id("FR12345")
+        self.assertEqual(player.id(), "FR12345")
         tournament.add_participant(player)
-        self.assertIs(tournament.player_is_registered('FR12345'), True)
+        self.assertIs(tournament.player_is_registered("FR12345"), True)
         self.assertIs(tournament.player_is_registered(player.id()), True)
-        self.assertIs(tournament.player_is_registered('FR 12345'), False)
-        self.assertIs(tournament.player_is_registered('FR54321'), False)
+        self.assertIs(tournament.player_is_registered("FR 12345"), False)
+        self.assertIs(tournament.player_is_registered("FR54321"), False)
 
     def test_start_first_round(self):
         """Starting the first Round starts the tournament and sets up matches for all pairs of players.
@@ -451,3 +495,143 @@ class TestTournament(unittest.TestCase):
         new_pairs = tournament._make_player_pairs()
         for p1, p2 in new_pairs:
             self.assertEqual(tournament._can_play(p1.id(), p2.id()), 1.0)
+
+    def test_start_a_match(self):
+        """Starting a match with the tournament object starts the match
+        and updates tournament metadata."""
+        tournament_meta = tournament_model.TournamentMetaData(
+            tournament_id="TestID",
+            start_date=date.fromisoformat("2024-06-01"),
+            location="Testlocation",
+        )
+        players = [utils.make_random_player() for _ in range(4)]
+        tournament = tournament_model.Tournament(
+            metadata=tournament_meta, participants=players
+        )
+        tournament.start_next_round()
+        self.assertEqual(tournament.current_round_idx, 0)
+        # start_next_round sets the current date as tournament start date
+        self.assertEqual(tournament.start_date().isoformat(), date.today().isoformat())
+        # start matches with a different date:
+        tournament.start_a_match(
+            match_index=0, start_time=datetime.fromisoformat("2024-06-12T15:25:34")
+        )
+        tournament.start_a_match(
+            match_index=1, start_time=datetime.fromisoformat("2024-06-11T15:15:34")
+        )
+        # tournament start date should be updated with the earliest match start date.
+        self.assertEqual(tournament.start_date().isoformat(), "2024-06-11")
+
+    def test_end_a_match(self):
+        """Ending a match with the tournament object ends the match
+        and updates scoreboard and tournament metadata."""
+        tournament_meta = tournament_model.TournamentMetaData(
+            tournament_id="TestID",
+            start_date=date.fromisoformat("2024-06-01"),
+            location="Testlocation",
+            round_count=2,
+        )
+        players = [
+            player_model.Player(
+                national_player_id="AA00001",
+                name="Test",
+                surname="One",
+                birthdate=date(1980, 1, 1),
+            ),
+            player_model.Player(
+                national_player_id="BB00002",
+                name="Test",
+                surname="Two",
+                birthdate=date(1980, 1, 1),
+            ),
+            player_model.Player(
+                national_player_id="CC00003",
+                name="Test",
+                surname="Three",
+                birthdate=date(1980, 1, 1),
+            ),
+            player_model.Player(
+                national_player_id="DD00004",
+                name="Test",
+                surname="Test",
+                birthdate=date(1980, 1, 1),
+            ),
+        ]
+        tournament = tournament_model.Tournament(
+            metadata=tournament_meta, participants=players
+        )
+        tournament.start_next_round()
+        m1 = tournament.start_a_match(
+            match_index=0, start_time=datetime.fromisoformat("2024-06-12T15:25:34")
+        )
+        m2 = tournament.start_a_match(
+            match_index=1, start_time=datetime.fromisoformat("2024-06-11T15:15:34")
+        )
+        tournament.end_a_match(
+            match_index=0,
+            winner_id=m1.player1().id(),
+            end_time=datetime.fromisoformat("2024-06-12T15:45:00"),
+        )
+        tournament.end_a_match(
+            match_index=1,
+            winner_id=None,
+            end_time=datetime.fromisoformat("2024-06-12T15:45:00"),
+        )
+        # score board should be updated:
+        ranking_list = tournament.ranking_list()
+        self.assertIn((m1.player1().id(), 1, 1.0), ranking_list)
+        self.assertIn((m1.player2().id(), 3, 0.0), ranking_list)
+        self.assertIn((m2.player1().id(), 2, 0.5), ranking_list)
+        self.assertIn((m2.player2().id(), 2, 0.5), ranking_list)
+        # end the tournament:
+        tournament.start_next_round()
+        for m in range(len(tournament.current_round().matches)):
+            tournament.start_a_match(
+                match_index=m, start_time=datetime.fromisoformat("2024-06-13T09:00:00")
+            )
+            tournament.end_a_match(
+                match_index=m,
+                winner_id=None,
+                end_time=datetime.fromisoformat("2024-06-13T09:10:00"),
+            )
+        #
+        # Tournament should be ended, and end date should be the date where the last match ended
+        self.assertTrue(tournament.has_ended())
+        self.assertEqual(tournament.metadata.end_date, date(2024, 6, 13))
+
+    @unittest.expectedFailure
+    def test_start_a_match_fails_no_current_round(self):
+        """Invalid: starting a match when there is no current round."""
+        meta = utils.make_tournament_metadata()
+        tournament = tournament_model.Tournament(metadata=meta)
+        self.assertEqual(tournament.current_round_idx, None)
+        tournament.start_a_match(match_index=0)
+
+    @unittest.expectedFailure
+    def test_end_a_match_fails_round_not_setup(self):
+        """Invalid: starting a match when the current round is not set up."""
+        meta = utils.make_tournament_metadata()
+        tournament = tournament_model.Tournament(metadata=meta)
+        tournament.add_participant(utils.make_random_player())
+        tournament.add_participant(utils.make_random_player())
+        tournament.current_round_idx = 0
+        tournament.start_a_match(match_index=0)
+
+    @unittest.expectedFailure
+    def test_start_a_match_fails_invalid_date(self):
+        """Invalid: starting a match before the latest round has ended."""
+        tournament = utils.make_tournament_not_started()
+        tournament.start_next_round()
+        # complete the first round
+        self.assertEqual(tournament.current_round_idx, 0)
+        for m in len(tournament.current_round().matches):
+            tournament.start_a_match(
+                m, start_time=datetime.fromisoformat("2024-05-01T12:00:00")
+            )
+            tournament.end_a_match(
+                m, start_time=datetime.fromisoformat("2024-05-01T13:15:00")
+            )
+        tournament.start_next_round()
+        self.assertEqual(tournament.current_round_idx, 1)
+        # fail:
+        tournament.start_a_match(0, datetime.fromisoformat("2024-05-01T12:30:00"))
