@@ -73,6 +73,21 @@ class TournamentInfoCommand(LaunchManagerCommand):
                          export_to=export_to)
 
 
+class TournamentParticipantsReportCommand(LaunchManagerCommand):
+    def __init__(self,
+                 tournament_id: str = None,
+                 app: CommandManagerInterface = None,
+                 export_as: str = None,
+                 export_to: Path = None
+                 ) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=ReportsManager,
+                         method=ReportsManager.tournament_participants_report,
+                         tournament_id=tournament_id,
+                         export_as=export_as,
+                         export_to=export_to)
+
+
 class ExportToHTMLCommand(LaunchManagerCommand):
     def __init__(self,
                  app: CommandManagerInterface,
@@ -140,8 +155,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
         menu.add_option(
             MenuOption(
                 option_text="Tournament Participants",
-                command=tournament_manager.ListRegisteredPlayersCommand(
-                    app=self.main_app, tournament_id=None, sorted_by="alpha"
+                command=TournamentParticipantsReportCommand(
+                    app=self.main_app, tournament_id=None
                 ),
             )
         )
@@ -297,6 +312,58 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                 ))
             self.main_app.receive(
                 tournament_manager.TournamentInfoCommand(app=self.main_app, tournament_id=tournament_id)
+            )
+
+    def tournament_participants_report(self, tournament_id: str = None, export_to: Path = None, export_as: str = None):
+        """Produce a report with participants of a tournament.
+        """
+        if not tournament_id:
+            # come back with a valid tournament ID...
+            self.main_app.receive(
+                tournament_manager.SelectTournamentCommand(
+                    app=self.main_app,
+                    tournament_id=None,
+                    confirm_cmd=TournamentParticipantsReportCommand(
+                        app=self.main_app,
+                        tournament_id=None
+                    )
+                )
+            )
+            return
+        if export_as == "html":
+            #
+            # Produce the html view and write to file
+            try:
+                tournament = self._get_tournament(tournament_id=tournament_id, use_current=False)
+                player_data = [p.asdict() for p in tournament.participants]
+                player_data.sort(key=lambda x: x.get("surname", "").upper() + x.get("name", "").upper())
+                title = f"Registered Players - tournament in {tournament.metadata.location}"
+                v = html_reports.PlayersReportHTML(
+                    title=title,
+                    player_list=player_data,
+                    cmd_manager=self.main_app,
+                    standalone=True
+                )
+                with RenderToFileContext(ofile=Path(export_to)):
+                    v.render()
+                self.status.notify_success(f"Wrote report to {export_to}")
+            except Exception as e:
+                logger.error(e, stack_info=True)
+                self.status.notify_failure(f"Failed to write report: {e}")
+        else:
+            # first display the text report produced by the tournament_manager
+            # then offer to export to an HTML file
+            self.main_app.receive(
+                ExportToHTMLCommand(
+                    app=self.main_app,
+                    confirm_cmd=TournamentParticipantsReportCommand(
+                        app=self.main_app,
+                        export_as="html",
+                        tournament_id=tournament_id
+                    )
+                ))
+            self.main_app.receive(
+                tournament_manager.ListRegisteredPlayersCommand(app=self.main_app, tournament_id=tournament_id)
             )
 
     def tournament_rounds_report(self, tournament_id: str = None, export_to: Path = None, export_as: str = None):
