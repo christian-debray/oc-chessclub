@@ -27,6 +27,11 @@ class MainController(CommandManagerInterface):
     def clear_state(self, key: str):
         """Removes an element from the application's current state."""
 
+    @abstractmethod
+    def get_config(self, key: str):
+        """Reads a configuration item
+        """
+
 
 class BaseController:
     def __init__(self):

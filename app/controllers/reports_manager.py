@@ -11,7 +11,8 @@ from app.models.player_model import PlayerRepository
 from app.models.tournament_model import TournamentRepository
 from app.controllers import player_manager, tournament_manager
 from app.views.reports.tournament_reports import TournamentReportView, ExportToHTMLDialog
-from app.views.html.reports import tournament_info_html
+from app.views.html.reports import html_reports
+from app.views.html.base_html import HTMLBaseView
 from pathlib import Path
 import logging
 
@@ -26,8 +27,34 @@ class TournamentReportCommand(LaunchManagerCommand):
                  ) -> None:
         super().__init__(app=app,
                          cls_or_obj=ReportsManager,
-                         method=ReportsManager.tournament_rounds_report,
+                         method=ReportsManager.tournament_report,
                          tournament_id=tournament_id,
+                         export_as=export_as,
+                         export_to=export_to)
+
+
+class PlayersReportCommand(LaunchManagerCommand):
+    def __init__(self,
+                 app: CommandManagerInterface = None,
+                 export_as: str = None,
+                 export_to: Path = None
+                 ) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=ReportsManager,
+                         method=ReportsManager.players_report,
+                         export_as=export_as,
+                         export_to=export_to)
+
+
+class TournamentListReportCommand(LaunchManagerCommand):
+    def __init__(self,
+                 app: CommandManagerInterface = None,
+                 export_as: str = None,
+                 export_to: Path = None
+                 ) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=ReportsManager,
+                         method=ReportsManager.tournament_list_report,
                          export_as=export_as,
                          export_to=export_to)
 
@@ -42,6 +69,21 @@ class TournamentInfoCommand(LaunchManagerCommand):
         super().__init__(app=app,
                          cls_or_obj=ReportsManager,
                          method=ReportsManager.tournament_info_report,
+                         tournament_id=tournament_id,
+                         export_as=export_as,
+                         export_to=export_to)
+
+
+class TournamentParticipantsReportCommand(LaunchManagerCommand):
+    def __init__(self,
+                 tournament_id: str = None,
+                 app: CommandManagerInterface = None,
+                 export_as: str = None,
+                 export_to: Path = None
+                 ) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=ReportsManager,
+                         method=ReportsManager.tournament_participants_report,
                          tournament_id=tournament_id,
                          export_as=export_as,
                          export_to=export_to)
@@ -92,14 +134,14 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
         menu.add_option(
             MenuOption(
                 option_text="List all players",
-                command=player_manager.ListAllPlayersCommand(app=self.main_app),
+                command=PlayersReportCommand(app=self.main_app),
             )
         )
         menu.add_option(
             MenuOption(
                 option_text="List all tournaments",
-                command=tournament_manager.ListTournamentsCommand(
-                    app=self.main_app, sort_by_date=True
+                command=TournamentListReportCommand(
+                    app=self.main_app
                 ),
             )
         )
@@ -114,8 +156,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
         menu.add_option(
             MenuOption(
                 option_text="Tournament Participants",
-                command=tournament_manager.ListRegisteredPlayersCommand(
-                    app=self.main_app, tournament_id=None, sorted_by="alpha"
+                command=TournamentParticipantsReportCommand(
+                    app=self.main_app, tournament_id=None
                 ),
             )
         )
@@ -150,6 +192,85 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                                    abandon_cmd=cancel_cmd)
             self.main_app.view(v)
 
+    def tournament_list_report(self, export_to: Path = None, export_as: str = None):
+        """Produce a report listing all tournaments registered in the database.
+        Sorted by start date order.
+        """
+        if export_as == "html":
+            #
+            # Produce the html view and write to file
+            try:
+                tournaments = self.tournament_repo.list_tournament_meta()
+                tournaments.sort(key=lambda x: x.start_date)
+                data = [m.asdict() for m in tournaments]
+                v = html_reports.TournamentListHTML(
+                    title="All Tournaments",
+                    tournament_list=data,
+                    cmd_manager=self.main_app,
+                    standalone=True
+                )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
+                with RenderToFileContext(ofile=Path(export_to)):
+                    v.render()
+                self.status.notify_success(f"Wrote report to {export_to}")
+            except Exception as e:
+                logger.error(e, stack_info=True)
+                self.status.notify_failure(f"Failed to write report: {e}")
+        else:
+            # first display the text report produced by the tournament_manager
+            # then offer to export to an HTML file
+            self.main_app.receive(
+                ExportToHTMLCommand(
+                    app=self.main_app,
+                    confirm_cmd=TournamentListReportCommand(
+                        app=self.main_app,
+                        export_as="html"
+                    )
+                ))
+            self.main_app.receive(
+                tournament_manager.ListTournamentsCommand(app=self.main_app, sort_by_date=True)
+            )
+
+    def players_report(self, export_to: Path = None, export_as: str = None):
+        """Produce a report listing all players registered in the database,
+        sorted by alphabetic order.
+        """
+        if export_as == "html":
+            #
+            # Produce the html view and write to file
+            try:
+                player_data = [p.asdict() for p in self.player_repo.list_all()]
+                player_data.sort(key=lambda x: x.get("surname", "").upper() + x.get("name", "").upper())
+                v = html_reports.PlayersReportHTML(
+                    title="Players List",
+                    player_list=player_data,
+                    cmd_manager=self.main_app,
+                    standalone=True
+                )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
+                with RenderToFileContext(ofile=Path(export_to)):
+                    v.render()
+                self.status.notify_success(f"Wrote report to {export_to}")
+            except Exception as e:
+                logger.error(e, stack_info=True)
+                self.status.notify_failure(f"Failed to write report: {e}")
+        else:
+            # first display the text report produced by the tournament_manager
+            # then offer to export to an HTML file
+            self.main_app.receive(
+                ExportToHTMLCommand(
+                    app=self.main_app,
+                    confirm_cmd=PlayersReportCommand(
+                        app=self.main_app,
+                        export_as="html"
+                    )
+                ))
+            self.main_app.receive(
+                player_manager.ListAllPlayersCommand(app=self.main_app)
+            )
+
     def tournament_info_report(self, tournament_id: str = None, export_to: Path = None, export_as: str = None):
         """Output tournament Info, optionnally export as HTML"""
         if not tournament_id:
@@ -165,15 +286,19 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
             )
             return
         if export_as == "html":
-            """TODO: produce the html view and write to file"""
+            #
+            # Produce the html view and write to file
             try:
                 tournament = self._get_tournament(tournament_id=tournament_id, use_current=False)
 
-                v = tournament_info_html.TournamentInfoHTML(
+                v = html_reports.TournamentInfoHTML(
                     title="Tournament Info",
                     tournament_data=tournament.metadata.asdict(),
-                    cmd_manager=self.main_app
+                    cmd_manager=self.main_app,
+                    standalone=True
                 )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
                 with RenderToFileContext(ofile=Path(export_to)):
                     v.render()
                 self.status.notify_success(f"Wrote report to {export_to}")
@@ -196,7 +321,61 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                 tournament_manager.TournamentInfoCommand(app=self.main_app, tournament_id=tournament_id)
             )
 
-    def tournament_rounds_report(self, tournament_id: str = None, export_to: Path = None, export_as: str = None):
+    def tournament_participants_report(self, tournament_id: str = None, export_to: Path = None, export_as: str = None):
+        """Produce a report with participants of a tournament.
+        """
+        if not tournament_id:
+            # come back with a valid tournament ID...
+            self.main_app.receive(
+                tournament_manager.SelectTournamentCommand(
+                    app=self.main_app,
+                    tournament_id=None,
+                    confirm_cmd=TournamentParticipantsReportCommand(
+                        app=self.main_app,
+                        tournament_id=None
+                    )
+                )
+            )
+            return
+        if export_as == "html":
+            #
+            # Produce the html view and write to file
+            try:
+                tournament = self._get_tournament(tournament_id=tournament_id, use_current=False)
+                player_data = [p.asdict() for p in tournament.participants]
+                player_data.sort(key=lambda x: x.get("surname", "").upper() + x.get("name", "").upper())
+                title = f"Registered Players - tournament in {tournament.metadata.location}"
+                v = html_reports.PlayersReportHTML(
+                    title=title,
+                    player_list=player_data,
+                    cmd_manager=self.main_app,
+                    standalone=True
+                )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
+                with RenderToFileContext(ofile=Path(export_to)):
+                    v.render()
+                self.status.notify_success(f"Wrote report to {export_to}")
+            except Exception as e:
+                logger.error(e, stack_info=True)
+                self.status.notify_failure(f"Failed to write report: {e}")
+        else:
+            # first display the text report produced by the tournament_manager
+            # then offer to export to an HTML file
+            self.main_app.receive(
+                ExportToHTMLCommand(
+                    app=self.main_app,
+                    confirm_cmd=TournamentParticipantsReportCommand(
+                        app=self.main_app,
+                        export_as="html",
+                        tournament_id=tournament_id
+                    )
+                ))
+            self.main_app.receive(
+                tournament_manager.ListRegisteredPlayersCommand(app=self.main_app, tournament_id=tournament_id)
+            )
+
+    def tournament_report(self, tournament_id: str = None, export_to: Path = None, export_as: str = None):
         """View details of all rounds in a tournament"""
         if not tournament_id:
             self.main_app.receive(
@@ -213,13 +392,87 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
         tournament = self._get_tournament(tournament_id)
         if not tournament:
             return
+        ranking_data = []
+        for player in tournament.participants:
+            ranking_data.append((
+                    tournament.player_rank(player.id()),
+                    player.asdict(),
+                    tournament.player_score(player.id())
+                ))
+        ranking_data.sort(key=lambda x: x[0])
         tournament_data = {
             "metadata": tournament.metadata.asdict(),
+            "ranking_list": ranking_data,
             "rounds": []
         }
         if tournament.has_started():
             for round in tournament.rounds:
                 if round is not None:
                     tournament_data["rounds"].append(self._tournament_round_data(round))
-        v = TournamentReportView(tournament_data=tournament_data)
-        self.main_app.view(v)
+
+        if export_as == "html":
+            #
+            # Produce the html view and write to file
+            try:
+                title = f"Tournament in {tournament.metadata.location}"
+                v = html_reports.TournamentReportHTML(
+                    title=title,
+                    tournament_data=tournament_data,
+                    cmd_manager=self.main_app,
+                    standalone=True
+                )
+                # also export the CSS
+                self._set_html_view_css(v, export_to)
+                with RenderToFileContext(ofile=Path(export_to)):
+                    v.render()
+                self.status.notify_success(f"Wrote report to {export_to}")
+            except Exception as e:
+                logger.error(e, stack_info=True)
+                self.status.notify_failure(f"Failed to write report: {e}")
+        else:
+            # first display the text report produced by the tournament_manager
+            # then offer to export to an HTML file
+            self.main_app.receive(
+                ExportToHTMLCommand(
+                    app=self.main_app,
+                    confirm_cmd=TournamentReportCommand(
+                        app=self.main_app,
+                        export_as="html",
+                        tournament_id=tournament_id
+                    )
+                ))
+            v = TournamentReportView(tournament_data=tournament_data)
+            self.main_app.view(v)
+
+    def _set_html_view_css(self, view: HTMLBaseView, dest_view_path: Path) -> bool:
+        """Adds a link to a css stylesheet in a view, and exports the css
+        file to the folder where the view should be exported.
+        """
+        if not dest_view_path:
+            return False
+        try:
+            if not isinstance(dest_view_path, Path):
+                dest_view_path = Path(dest_view_path)
+            css_file: Path = Path(self.main_app.get_config('report_css_file'))
+            if not css_file or not css_file.exists():
+                return
+            exported_css_file_abs = Path(dest_view_path.parent, css_file.name).resolve()
+            #
+            # try to copy the css file to the destination path
+            #
+            if not exported_css_file_abs.exists():
+                if not exported_css_file_abs.parent.exists():
+                    exported_css_file_abs.parent.mkdir(mode=0o777)
+                exported_css_file_abs.touch(mode=0o666)
+
+            with open(css_file, "r", encoding="utf8") as orig_f:
+                with open(exported_css_file_abs, "w", encoding="utf8") as dest_f:
+                    dest_f.write(orig_f.read())
+            #
+            # prefer a relative path in the final HTML link
+            #
+            view.stylesheets_links.append(css_file.name)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to export css file: {e}", stack_info=True)
+        return False
