@@ -11,7 +11,7 @@ from app.models.player_model import PlayerRepository
 from app.models.tournament_model import TournamentRepository
 from app.controllers import player_manager, tournament_manager
 from app.views.reports.tournament_reports import TournamentReportView, ExportToHTMLDialog
-from app.views.html.reports import tournament_info_html, players_report_html
+from app.views.html.reports import html_reports
 from pathlib import Path
 import logging
 
@@ -32,6 +32,32 @@ class TournamentReportCommand(LaunchManagerCommand):
                          export_to=export_to)
 
 
+class PlayersReportCommand(LaunchManagerCommand):
+    def __init__(self,
+                 app: CommandManagerInterface = None,
+                 export_as: str = None,
+                 export_to: Path = None
+                 ) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=ReportsManager,
+                         method=ReportsManager.players_report,
+                         export_as=export_as,
+                         export_to=export_to)
+
+
+class TournamentListReportCommand(LaunchManagerCommand):
+    def __init__(self,
+                 app: CommandManagerInterface = None,
+                 export_as: str = None,
+                 export_to: Path = None
+                 ) -> None:
+        super().__init__(app=app,
+                         cls_or_obj=ReportsManager,
+                         method=ReportsManager.tournament_list_report,
+                         export_as=export_as,
+                         export_to=export_to)
+
+
 class TournamentInfoCommand(LaunchManagerCommand):
     def __init__(self,
                  tournament_id: str = None,
@@ -43,19 +69,6 @@ class TournamentInfoCommand(LaunchManagerCommand):
                          cls_or_obj=ReportsManager,
                          method=ReportsManager.tournament_info_report,
                          tournament_id=tournament_id,
-                         export_as=export_as,
-                         export_to=export_to)
-
-
-class PlayersReportCommand(LaunchManagerCommand):
-    def __init__(self,
-                 app: CommandManagerInterface = None,
-                 export_as: str = None,
-                 export_to: Path = None
-                 ) -> None:
-        super().__init__(app=app,
-                         cls_or_obj=ReportsManager,
-                         method=ReportsManager.players_report,
                          export_as=export_as,
                          export_to=export_to)
 
@@ -111,8 +124,8 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
         menu.add_option(
             MenuOption(
                 option_text="List all tournaments",
-                command=tournament_manager.ListTournamentsCommand(
-                    app=self.main_app, sort_by_date=True
+                command=TournamentListReportCommand(
+                    app=self.main_app
                 ),
             )
         )
@@ -163,7 +176,45 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
                                    abandon_cmd=cancel_cmd)
             self.main_app.view(v)
 
-    def players_report(self,  export_to: Path = None, export_as: str = None):
+    def tournament_list_report(self, export_to: Path = None, export_as: str = None):
+        """Produce a report listing all tournaments registered in the database.
+        Sorted by start date order.
+        """
+        if export_as == "html":
+            #
+            # Produce the html view and write to file
+            try:
+                tournaments = self.tournament_repo.list_tournament_meta()
+                tournaments.sort(key=lambda x: x.start_date)
+                data = [m.asdict() for m in tournaments]
+                v = html_reports.TournamentListHTML(
+                    title="All Tournaments",
+                    tournament_list=data,
+                    cmd_manager=self.main_app,
+                    standalone=True
+                )
+                with RenderToFileContext(ofile=Path(export_to)):
+                    v.render()
+                self.status.notify_success(f"Wrote report to {export_to}")
+            except Exception as e:
+                logger.error(e, stack_info=True)
+                self.status.notify_failure(f"Failed to write report: {e}")
+        else:
+            # first display the text report produced by the tournament_manager
+            # then offer to export to an HTML file
+            self.main_app.receive(
+                ExportToHTMLCommand(
+                    app=self.main_app,
+                    confirm_cmd=TournamentListReportCommand(
+                        app=self.main_app,
+                        export_as="html"
+                    )
+                ))
+            self.main_app.receive(
+                tournament_manager.ListTournamentsCommand(app=self.main_app, sort_by_date=True)
+            )
+
+    def players_report(self, export_to: Path = None, export_as: str = None):
         """Produce a report listing all players registered in the database,
         sorted by alphabetic order.
         """
@@ -173,7 +224,7 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
             try:
                 player_data = [p.asdict() for p in self.player_repo.list_all()]
                 player_data.sort(key=lambda x: x.get("surname", "").upper() + x.get("name", "").upper())
-                v = players_report_html.PlayersReportHTML(
+                v = html_reports.PlayersReportHTML(
                     title="Players List",
                     player_list=player_data,
                     cmd_manager=self.main_app,
@@ -220,7 +271,7 @@ class ReportsManager(tournament_manager.TournamentManagerBase):
             try:
                 tournament = self._get_tournament(tournament_id=tournament_id, use_current=False)
 
-                v = tournament_info_html.TournamentInfoHTML(
+                v = html_reports.TournamentInfoHTML(
                     title="Tournament Info",
                     tournament_data=tournament.metadata.asdict(),
                     cmd_manager=self.main_app,
