@@ -518,7 +518,7 @@ class RunningTournamentManager(tournament_manager.TournamentManagerBase):
                     player.asdict(),
                     tournament.player_score(player.id())
                 ))
-        ranking_data.sort(key=lambda x: x[0])
+        ranking_data.sort(key=lambda x: x[0] or 0)
         v = RankingView(cmd_manager=self.main_app,
                         rank_data=ranking_data,
                         title=title,
