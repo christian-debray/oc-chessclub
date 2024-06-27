@@ -267,8 +267,7 @@ class Tournament:
                 self._player_opponents[mtch.player1().id()].append(mtch.player2().id())
                 self._player_opponents[mtch.player2().id()].append(mtch.player1().id())
 
-        self.update_score_board()
-        self.update_end_date()
+        self._update_state()
         if participants and self.has_started() and len(participants) % 2 > 0:
             raise ValueError(
                 "Running or Ended Tournament require even number of participants; uneven list given."
@@ -355,6 +354,13 @@ class Tournament:
             return "ended"
         return "(status unknown)"
 
+    def _update_state(self):
+        """Update state and meta-data of this tournament:
+        scoreboard, status, end_date..."""
+        self.update_score_board()
+        self.update_end_date()
+        self.metadata.status = self.status()
+
     def update_end_date(self):
         """Update the end date of this tournament."""
         if self.has_ended() and self.metadata.end_date is None:
@@ -363,7 +369,6 @@ class Tournament:
             self.metadata.end_date = date(
                 year=end_datetime.year, month=end_datetime.month, day=end_datetime.day
             )
-        self.metadata.status = self.status()
 
     def player_score(self, player_id: NationalPlayerID) -> float:
         """Returns the score of one player"""
@@ -417,10 +422,11 @@ class Tournament:
         self.current_round_idx = (
             self.current_round_idx + 1 if self.current_round_idx is not None else 0
         )
-
+        # staring a torunament:
         # update start date with actual date where first Round got started.
         if self.current_round_idx == 0:
             self.metadata.start_date = date.today()
+            self._update_state()
         self.rounds[self.current_round_idx] = Round(
             name=f"Round {self.current_round_idx + 1}"
         )
@@ -537,8 +543,7 @@ class Tournament:
                 return None
             match = current_round.matches[match_index]
             result = match.end(winner=winner_id, end_time=end_time)
-            self.update_end_date()
-            self.update_score_board()
+            self._update_state()
             return result
         else:
             return None
@@ -702,7 +707,7 @@ class Tournament:
         Useful when exporting to JSON.
         Player objects are converted to their National Player ID.
         """
-        self.update_end_date()
+        self._update_state()
         return {
             "tournament_id": self.id(),
             "metadata": self.metadata.asdict(),
@@ -980,7 +985,7 @@ if __name__ == "__main__":
             logger.debug("Ranking after Round: ", ranking_str)
             logger.debug("Ranking after Round:\n" + ranking_str)
             logger.debug("Write to file...")
-            tournament.update_end_date()
+            tournament._update_state()
             tournament_repo.store_tournament(tournament)
         print("Done")
         assert tournament.has_ended() is False

@@ -146,7 +146,7 @@ class MainController(MainController):
     """
 
     def __init__(self):
-        self._command_queue: list[CommandInterface] = []
+        self._command_stack: list[CommandInterface] = []
         self._received_stop_command = False
         self._views: list[AbstractView] = []
         self._config: AppConfig = AppConfig()
@@ -193,7 +193,7 @@ class MainController(MainController):
                 self._received_stop_command = True
                 cmd.execute()
             else:
-                self._command_queue.append(cmd)
+                self._command_stack.append(cmd)
 
     def view(self, viewobj: AbstractView):
         """Load a view to the current view store.
@@ -271,17 +271,17 @@ class MainController(MainController):
         """Exits the app without delay."""
         logger.debug("Exit app without delay.")
         self._received_stop_command = True
-        self._command_queue = []
+        self._command_stack = []
         self._views = []
         exit()
 
     def exit_current(self):
         """Exits current context."""
         logger.debug(
-            f"Exit current context: {len(self._command_queue)} -> {len(self._command_queue) - 1}"
+            f"Exit current context: {len(self._command_stack)} -> {len(self._command_stack) - 1}"
         )
-        if len(self._command_queue) > 0:
-            self._command_queue.pop()
+        if len(self._command_stack) > 0:
+            self._command_stack.pop()
 
     def launch(self, cls_or_obj, method="default", **kwargs):
         """Launches a manager / controller.
@@ -371,27 +371,25 @@ class MainController(MainController):
             cmd_list = list(reversed(self.interpret_script(cmd_script)))
             self.receive(*cmd_list)
 
-        while len(self._command_queue) > 0 and self._received_stop_command is False:
-            if len(self._command_queue) > 0:
-                logger.debug(f"{len(self._command_queue)} commands found in queue")
-                cmd = self._command_queue.pop()
-                logger.debug(f"executing command {cmd.__class__}")
+        while len(self._command_stack) > 0 and self._received_stop_command is False:
+            logger.debug(f"Main loop: {len(self._command_stack)} commands found in stack")
+            cmd = self._command_stack.pop()
+            logger.debug(f"executing command {cmd.__class__}")
 
-                # should we repeat this command next loop ?
-                if cmd.cycle is True:
-                    self.receive(cmd)
-                elif isinstance(cmd.cycle, int) and cmd.cycle > 0:
-                    cmd.cycle -= 1
-                    self.receive(cmd)
+            # should we repeat this command next loop ?
+            if cmd.cycle is True:
+                self.receive(cmd)
+            elif isinstance(cmd.cycle, int) and cmd.cycle > 0:
+                cmd.cycle -= 1
+                self.receive(cmd)
 
-                cmd.execute()
-                self.render_views()
+            cmd.execute()
             self.render_views()
             sleep(0.01)
         logger.debug(
             "Main loop ended, stop application because {}.".format(
                 "command queue is empty"
-                if len(self._command_queue) == 0
+                if len(self._command_stack) == 0
                 else "stop command received"
             )
         )
