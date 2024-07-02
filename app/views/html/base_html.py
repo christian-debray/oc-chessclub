@@ -48,10 +48,3 @@ class HTMLBaseView(AbstractView):
             return indent(doc.getvalue())
         else:
             return doc.getvalue()
-
-
-if __name__ == "__main__":
-    testdoc = HTMLBaseView(None)
-    testdoc.title = "test title"
-    testdoc.stylesheets_links = ["toto.css", "css/foo/bar.css", "https://www.no-css.com/not/found/1234"]
-    print(testdoc.document("Hello World"))
