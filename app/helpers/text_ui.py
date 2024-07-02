@@ -13,7 +13,7 @@ def prompt_v(
     validator: str | Callable = None,
     not_valid_msg: str = None,
     skip_blank=False,
-    shortcuts: dict[str, str] = None
+    shortcuts: dict[str, str] = None,
 ):
     """Prompts user for input and validates the input, with a basic support for shortcuts.
     Returns value only if validated, or the value associated with a shortuct if the shortcut is
@@ -133,94 +133,110 @@ def format_table(
     line_sep: str = "-",
 ) -> str:
     """Formats a list of string cells as a table."""
-    # first evaluate the dimensions: row lines and  column widths
-    if len(table_data) == 0:
-        return ""
-    table: list[list[list[str]]] = []
-    heights = [0 for _ in range(len(table_data))]
-    widths = [0 for _ in range(len(table_data[0]))]
-    for r in range(len(table_data)):
-        row = table_data[r]
-        table.append([])
-        for c in range(len(row)):
-            cell = row[c].splitlines() if row[c] else []
-            if cell:
-                cell_w = max([len(lc) for lc in cell])
+    formatter = TableFormatter(
+        table_data=table_data, pad_left=pad_left, pad_right=pad_right, cell_sep=cell_sep, line_sep=line_sep
+    )
+    return formatter.render()
+
+
+class TableFormatter:
+    """Helper class to format text tables."""
+
+    class TableCell:
+        """Represents a cell in a text table"""
+
+        def __init__(
+            self,
+            content: str,
+            width: int = 0,
+            height: int = 0,
+            pad_left: int = 1,
+            pad_right: int = 1,
+        ):
+            self.lines: list[str] = content.splitlines()
+            self.min_width: int = width
+            self.min_height: int = height
+            self.pad_left: int = pad_left
+            self.pad_right: int = pad_right
+
+        def width(self) -> int:
+            """Computes the width of this cell."""
+            return max(self.min_width, max([self.pad_left + len(line) + self.pad_right for line in self.lines]))
+
+        def height(self) -> int:
+            """Computes the height of this cell."""
+            return max(self.min_height, len(self.lines))
+
+        def render_line(self, line_idx: int, min_width: int = 0) -> str:
+            """Renders this cell as a list of text lines with normalized width."""
+            width = max(min_width, self.width())
+            if line_idx >= len(self.lines):
+                return " " * width
             else:
-                cell_w = 0
-                cell = []
-            if cell_w > widths[c]:
-                widths[c] = cell_w
-            if len(cell) > heights[r]:
-                heights[r] = len(cell)
-            table[-1].append(cell)
+                line_str = " "*self.pad_left
+                line_str += self.lines[line_idx]
+                line_str += " "*self.pad_right
+                return line_str.ljust(width)
 
-    lines = []
+    def __init__(
+        self,
+        table_data: list[list[str]],
+        pad_left: int = 1,
+        pad_right: int = 1,
+        cell_sep="|",
+        line_sep="-",
+    ):
+        self.cellpad_left = pad_left
+        self.cellpad_right = pad_right
+        self.rows: list[list[TableFormatter.TableCell]] = []
+        self.widths: list[int] = []
+        self.cell_sep: str = cell_sep
+        self.line_sep: str = line_sep
+        self.set_table_data(table_data)
 
-    if line_sep:
-        ruler = (
-            "+"
-            + "+".join(
-                [line_sep * (pad_left + pad_right + c_width) for c_width in widths]
+    def set_table_data(self, table_data: list[list[str]]):
+        self.rows = []
+        self.widths = [0 for _ in range(len(table_data[0]))]
+        for r, row in enumerate(table_data):
+            self.rows.append([])
+            for c, cell_str in enumerate(row):
+                cell = TableFormatter.TableCell(
+                    cell_str, pad_left=self.cellpad_left, pad_right=self.cellpad_right
+                )
+                self.rows[-1].append(cell)
+                self.widths[c] = max(self.widths[c], cell.width())
+
+    def _render_row(self, row: list[TableCell]):
+        """renders a single row as a string"""
+        height = max([cell.height() for cell in row])
+        o_lines = []
+        #
+        # render the cells line by line
+        #
+        for l_idx in range(height):
+            cells_str = []
+            for r, cell in enumerate(row):
+                cells_str.append(cell.render_line(l_idx, min_width=self.widths[r]))
+            o_lines.append(
+                self.cell_sep + self.cell_sep.join(cells_str) + self.cell_sep
             )
-            + "+"
+        # now join the lines
+        return "\n".join(o_lines)
+
+    def render(self) -> str:
+        """renders the table as a single string"""
+        ruler = self.table_ruler()
+        row_str = [ruler] if ruler else []
+        for row in self.rows:
+            row_str.append(self._render_row(row))
+            if ruler:
+                row_str.append(ruler)
+        return "\n".join(row_str)
+
+    def table_ruler(self) -> str:
+        if not self.line_sep:
+            return ""
+        ruler = (
+            "+" + "+".join([self.line_sep * c_width for c_width in self.widths]) + "+"
         )
-    for r in range(len(heights)):
-        row_str = []
-        if line_sep:
-            row_str.append(ruler)
-        # row line
-        if r > len(table):
-            continue
-        for rl in range(heights[r]):
-            line_inner = []
-            # columns
-            for c in range(len(widths)):
-                if c > len(table[r]):
-                    continue
-                empty_cell_line = " " * (pad_left + widths[c] + pad_right)
-                if rl < len(table[r][c]):
-                    line_inner.append(
-                        " " * pad_left
-                        + table[r][c][rl].ljust(widths[c])
-                        + " " * pad_right
-                    )
-                else:
-                    line_inner.append(empty_cell_line)
-            if cell_sep:
-                row_str.append(cell_sep + cell_sep.join(line_inner) + cell_sep)
-            else:
-                row_str.append("".join(line_inner))
-        lines.append("\n".join(row_str))
-    if line_sep:
-        lines.append(ruler)
-    return "\n".join(lines)
-
-    # then output the table
-
-
-if __name__ == "__main__":
-    lorem_ipsum = """Lorem ipsum dolor sit amet,
-    consectetur adipiscing elit. Suspendisse ut consequat lectus.
-    Aenean maximus est eget magna volutpat, in dignissim."""
-
-    table_data = [
-        [
-            "Lorem Ipsum",
-            "dolor sit amet,\nconsectetur adipiscing elit.",
-            "Suspendisee\n\nut consequat",
-            "lectus.",
-        ],
-        ["", "Aenean\nmaximus\nest", "\neget", "magna\voluptat, in dignissim"],
-        [
-            "Lorem Ipsum",
-            "dolor sit amet,",
-            "consectetur adipiscing elit.",
-            "Suspendisse",
-        ],
-        ["ut consequat lectus.", "", "", "Aenean maximus est"],
-        ["magna volutpat,", "in dignissim.", "", ""],
-    ]
-
-    table_str = format_table(table_data, pad_left=1, pad_right=1)
-    print(table_str)
+        return ruler
